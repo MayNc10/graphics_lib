@@ -1,5 +1,8 @@
 use glium::{self, glutin::{self, event_loop::EventLoop}, Surface, uniform, Display};
-use graphics_lib::two_d::{*, transform::*};
+use graphics_lib::two_d;
+use graphics_lib::three_d;
+use graphics_lib::matrix::*;
+use graphics_lib::three_d::teapot;
 use image;
 
 fn main() {
@@ -13,25 +16,26 @@ fn main() {
     let cb = glium::glutin::ContextBuilder::new();
     let display = Display::new(wb, cb, &event_loop).unwrap();
     
-    demo_2d(event_loop, display);
+    //demo_2d(event_loop, display);
+    demo_3d(event_loop, display);
 }
 
 fn demo_2d(event_loop: EventLoop<()>, display: Display) {
     // List vertices for our "lighting bolt"
     /* 
-    let vertex1 = shape::TextureVertex { position: [0.0, 0.0], tex_coords: [0.5, 0.5] };
-    let vertex2 = shape::TextureVertex { position: [0.0, 1.0], tex_coords: [0.0, 1.0] };
-    let vertex3 = shape::TextureVertex { position: [1.0, 1.0], tex_coords: [1.0, 1.0] };
-    let vertex4 = shape::TextureVertex { position: [1.0, 0.0], tex_coords: [1.0, 0.5] };
-    let vertex5 = shape::TextureVertex { position: [0.5, 0.0], tex_coords: [0.75, 0.5] };
-    let vertex6 = shape::TextureVertex { position: [0.5, -1.0], tex_coords: [0.75, 0.0] };
-    let vertex7 = shape::TextureVertex { position: [-1.0, -1.0], tex_coords: [0.0, 0.0] };
-    let vertex8 = shape::TextureVertex { position: [-1.0, 0.0], tex_coords: [0.0, 0.5] };
+    let vertex1 = two_d::shape::TextureVertex { position: [0.0, 0.0], tex_coords: [0.5, 0.5] };
+    let vertex2 = two_d::shape::TextureVertex { position: [0.0, 1.0], tex_coords: [0.0, 1.0] };
+    let vertex3 = two_d::shape::TextureVertex { position: [1.0, 1.0], tex_coords: [1.0, 1.0] };
+    let vertex4 = two_d::shape::TextureVertex { position: [1.0, 0.0], tex_coords: [1.0, 0.5] };
+    let vertex5 = two_d::shape::TextureVertex { position: [0.5, 0.0], tex_coords: [0.75, 0.5] };
+    let vertex6 = two_d::shape::TextureVertex { position: [0.5, -1.0], tex_coords: [0.75, 0.0] };
+    let vertex7 = two_d::shape::TextureVertex { position: [-1.0, -1.0], tex_coords: [0.0, 0.0] };
+    let vertex8 = two_d::shape::TextureVertex { position: [-1.0, 0.0], tex_coords: [0.0, 0.5] };
     */
-    let vertex1 = shape::TextureVertex { position: [-1.0, 1.0], tex_coords: [0.0, 1.0] };
-    let vertex2 = shape::TextureVertex { position: [1.0, 1.0], tex_coords: [1.0, 1.0] };
-    let vertex3 = shape::TextureVertex { position: [1.0, -1.0], tex_coords: [1.0, 0.0] };
-    let vertex4 = shape::TextureVertex { position: [-1.0, -1.0], tex_coords: [0.0, 0.0] };
+    let vertex1 = two_d::shape::TextureVertex { position: [-1.0, 1.0], tex_coords: [0.0, 1.0] };
+    let vertex2 = two_d::shape::TextureVertex { position: [1.0, 1.0], tex_coords: [1.0, 1.0] };
+    let vertex3 = two_d::shape::TextureVertex { position: [1.0, -1.0], tex_coords: [1.0, 0.0] };
+    let vertex4 = two_d::shape::TextureVertex { position: [-1.0, -1.0], tex_coords: [0.0, 0.0] };
 
 
     let image_bytes = include_bytes!("..\\media\\dargenio.jpg");
@@ -42,11 +46,11 @@ fn demo_2d(event_loop: EventLoop<()>, display: Display) {
     let x_offset = 0.0;
     let y_offset = 0.0;
     let scaling = [1.0; 3];
-    let transform = transform::generate_transform(Some(angle), Some(x_offset), Some(y_offset), 
+    let transform = generate_transform(Some(angle), Some(x_offset), Some(y_offset), 
         Some(&scaling));
 
-    // Create a shape from the vertices. We list the vertices in such a way to create two triangles, since triangles are the primitive shape
-    let mut shape = shape::Shape::new_convex_texture(
+    // Create a shape from the vertices. We list the vertices in such a way to create two triangles, since triangles are the primitive two_d::shape
+    let mut shape = two_d::shape::Shape::new_convex_texture(
         &[vertex1, vertex2, vertex3, vertex4], 
             &display, image_bytes, image::ImageFormat::Jpeg, Some(&transform));
 
@@ -114,5 +118,52 @@ fn demo_2d(event_loop: EventLoop<()>, display: Display) {
         // Draw, using the vertexs, the shaders, and the matrix
         shape.draw(&mut target, &display);
         target.finish().unwrap();
+    });
+}
+
+fn demo_3d(event_loop: EventLoop<()>, display: Display) {
+    let positions  = glium::VertexBuffer::new(&display, &teapot::VERTICES).unwrap();
+    let normals = glium::VertexBuffer::new(&display, &teapot::NORMALS).unwrap();
+    let indices = glium::IndexBuffer::new(&display, glium::index::PrimitiveType::TrianglesList,
+                                        &teapot::INDICES).unwrap();
+
+
+    // Scale down shape
+    let transform = generate_transform(None, None, None, Some(&[0.01; 3]));
+    let shape = three_d::shape::Shape::new(positions, normals, indices, Some(transform));
+    
+
+    // Create the main event loop
+    event_loop.run(move |event, _, control_flow| {
+        let draw = || {
+            // Create a drawing target
+            let mut target = display.draw();
+            target.clear_color(1.0, 1.0, 1.0, 1.0);              
+
+            // Draw, using the vertexs, the shaders, and the matrix
+            shape.draw(&mut target, &display);
+            target.finish().unwrap();
+        };
+
+        // Handle window closing events (return) and New events from the OS (return or ignore)
+        match event {
+            glutin::event::Event::WindowEvent { event, .. } => match event {
+                glutin::event::WindowEvent::CloseRequested => {
+                    *control_flow = glutin::event_loop::ControlFlow::Exit;
+                    return;
+                },
+                _ => return,
+            },
+            glutin::event::Event::NewEvents(cause) => match cause {
+                glutin::event::StartCause::ResumeTimeReached { .. } => (),
+                glutin::event::StartCause::Init => (),
+                _ => return,
+            },
+            glutin::event::Event::RedrawRequested(_) => { draw(); }
+            glutin::event::Event::RedrawEventsCleared => { draw(); }
+            _ => return,
+        }
+
+        
     });
 }
