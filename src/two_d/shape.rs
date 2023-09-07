@@ -1,7 +1,7 @@
 use glium::{self, implement_vertex, Surface, Frame, uniform, uniforms::{UniformsStorage, EmptyUniforms}, Display};
 use image;
 
-use super::transform::{IDENTITY, Matrix};
+use crate::matrix::{IDENTITY, Matrix};
 use super::triangulate::*;
 
 // This is a vertex that defines its own color
