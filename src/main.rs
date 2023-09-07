@@ -1,24 +1,118 @@
-extern crate glium;
+use glium::{self, glutin::{self, event_loop::EventLoop}, Surface, uniform, Display};
+use graphics_lib::two_d::{*, transform::*};
+use image;
 
 fn main() {
+    // Create event loop
     let event_loop = glium::glutin::event_loop::EventLoop::new();
 
+    // Initialize window and display
     let wb = glium::glutin::window::WindowBuilder::new()
         .with_inner_size(glium::glutin::dpi::LogicalSize::new(800.0, 600.0))
         .with_title("Hello world");
     let cb = glium::glutin::ContextBuilder::new();
-    let display = glium::Display::new(wb, cb, &event_loop).unwrap();
+    let display = Display::new(wb, cb, &event_loop).unwrap();
+    
+    demo_2d(event_loop, display);
+}
 
-    event_loop.run(move | event, _, control_flow | 
-    match event {
-        glium::glutin::event::Event::WindowEvent { event, .. } => 
-        match event { 
-            glium::glutin::event::WindowEvent::CloseRequested => {
-                *control_flow = glium::glutin::event_loop::ControlFlow::Exit;
-                return;
+fn demo_2d(event_loop: EventLoop<()>, display: Display) {
+    // List vertices for our "lighting bolt"
+    /* 
+    let vertex1 = shape::TextureVertex { position: [0.0, 0.0], tex_coords: [0.5, 0.5] };
+    let vertex2 = shape::TextureVertex { position: [0.0, 1.0], tex_coords: [0.0, 1.0] };
+    let vertex3 = shape::TextureVertex { position: [1.0, 1.0], tex_coords: [1.0, 1.0] };
+    let vertex4 = shape::TextureVertex { position: [1.0, 0.0], tex_coords: [1.0, 0.5] };
+    let vertex5 = shape::TextureVertex { position: [0.5, 0.0], tex_coords: [0.75, 0.5] };
+    let vertex6 = shape::TextureVertex { position: [0.5, -1.0], tex_coords: [0.75, 0.0] };
+    let vertex7 = shape::TextureVertex { position: [-1.0, -1.0], tex_coords: [0.0, 0.0] };
+    let vertex8 = shape::TextureVertex { position: [-1.0, 0.0], tex_coords: [0.0, 0.5] };
+    */
+    let vertex1 = shape::TextureVertex { position: [-1.0, 1.0], tex_coords: [0.0, 1.0] };
+    let vertex2 = shape::TextureVertex { position: [1.0, 1.0], tex_coords: [1.0, 1.0] };
+    let vertex3 = shape::TextureVertex { position: [1.0, -1.0], tex_coords: [1.0, 0.0] };
+    let vertex4 = shape::TextureVertex { position: [-1.0, -1.0], tex_coords: [0.0, 0.0] };
+
+
+    let image_bytes = include_bytes!("..\\media\\dargenio.jpg");
+
+    // Rotate some angle
+    let mut angle: f32 = 0.0;
+    angle = (angle / 180.0) * std::f32::consts::PI;
+    let x_offset = 0.0;
+    let y_offset = 0.0;
+    let scaling = [1.0; 3];
+    let transform = transform::generate_transform(Some(angle), Some(x_offset), Some(y_offset), 
+        Some(&scaling));
+
+    // Create a shape from the vertices. We list the vertices in such a way to create two triangles, since triangles are the primitive shape
+    let mut shape = shape::Shape::new_convex_texture(
+        &[vertex1, vertex2, vertex3, vertex4], 
+            &display, image_bytes, image::ImageFormat::Jpeg, Some(&transform));
+
+    // Set a target for fps (don't run faster or slower than this)
+    const TARGET_FPS: u64 = 60;
+
+    // t is our start time, delta is what we increase it by each time
+    let mut t: f32 = 0.0;
+    let delta: f32 = 0.02;
+
+    // Create the main event loop
+    event_loop.run(move |event, _, control_flow| {
+        // When did this pass start?
+        let start_time = std::time::Instant::now();
+
+        // Handle window closing events (return) and New events from the OS (return or ignore)
+        match event {
+            glutin::event::Event::WindowEvent { event, .. } => match event {
+                glutin::event::WindowEvent::CloseRequested => {
+                    *control_flow = glutin::event_loop::ControlFlow::Exit;
+                    return;
+                },
+                _ => return,
+            },
+            glutin::event::Event::NewEvents(cause) => match cause {
+                glutin::event::StartCause::ResumeTimeReached { .. } => (),
+                glutin::event::StartCause::Init => (),
+                _ => return,
             },
             _ => return,
-        },
-        _ => return,
+        }
+
+        // How long has this pass taken?
+        let elapsed_time = std::time::Instant::now().duration_since(start_time).as_millis() as u64;
+
+        // How long should we wait for to run at 60 fps?
+        let wait_millis = match 1000 / TARGET_FPS >= elapsed_time {
+            true => 1000 / TARGET_FPS - elapsed_time,
+            false => 0
+        };
+        let new_inst = start_time + std::time::Duration::from_millis(wait_millis);
+        // Wait that long
+        *control_flow =  glutin::event_loop::ControlFlow::WaitUntil(new_inst);
+        // Update time
+        t += delta;
+
+        // Create a drawing target
+        let mut target = display.draw();
+        target.clear_color(0.0, 0.0, 1.0, 1.0);
+
+        // animate
+        
+        if true { //t < 5.0 {
+            let scale = [t / 5.0; 3];
+            let angle = (360.0 * (t/ 2.0)) / 180.0 * std::f32::consts::PI;
+
+            let transform = generate_transform(Some(angle), 
+                None, None, Some(&scale));
+
+            shape.set_transform_matrix(transform);
+
+        } 
+        
+
+        // Draw, using the vertexs, the shaders, and the matrix
+        shape.draw(&mut target, &display);
+        target.finish().unwrap();
     });
 }
