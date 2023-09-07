@@ -25,3 +25,27 @@ pub fn generate_transform(angle: Option<f32>, x_offset: Option<f32>, y_offset: O
     return transform;
 }
 
+pub fn scale(m: &mut Matrix, scaling: &[f32; 3]) {
+    m[0][0] *= scaling[0];
+    m[1][1] *= scaling[1];
+    m[2][2] *= scaling[2];
+}
+
+pub fn rotate_y(m: &mut Matrix, angle: f32) {
+    // all the roation matrices
+    // https://math.stackexchange.com/questions/351472/3d-matrix-rotation
+    let mut add_value = |c: (usize, usize), v: f32| {
+        if m[c.0][c.1] == 0.0 {
+            m[c.0][c.1] = v;
+        }
+        else {
+            m[c.0][c.1] *= v;
+        }
+    };
+
+    add_value((0,0), angle.cos());
+    add_value((0,2), angle.sin());
+    add_value((2,0), -angle.sin());
+    add_value((2,2), angle.cos());
+}
+

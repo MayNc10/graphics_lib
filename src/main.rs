@@ -130,20 +130,40 @@ fn demo_3d(event_loop: EventLoop<()>, display: Display) {
 
     // Scale down shape
     let transform = generate_transform(None, None, None, Some(&[0.01; 3]));
-    let shape = three_d::shape::Shape::new(positions, normals, indices, Some(transform));
+    let mut shape = three_d::shape::Shape::new(positions, normals, indices, Some(transform));
     
+    // Set a target for fps (don't run faster or slower than this)
+    const TARGET_FPS: u64 = 60;
+
+    // t is our start time, delta is what we increase it by each time
+    let mut t: f32 = 0.0;
+    let delta: f32 = 0.02;
 
     // Create the main event loop
     event_loop.run(move |event, _, control_flow| {
-        let draw = || {
+        let mut draw = || {
             // Create a drawing target
             let mut target = display.draw();
             target.clear_color(1.0, 1.0, 1.0, 1.0);              
 
             // Draw, using the vertexs, the shaders, and the matrix
+            // spin shape
+            let mut transform = IDENTITY;
+            // scale matrix
+            //scale(&mut transform, &[0.01; 3]);
+            // rotate matrix
+            let angle = (360.0 * (t / 20.0)) * std::f32::consts::PI / 180.0;
+            //rotate_y(&mut transform, angle);
+            transform = generate_transform(Some(angle), None, None, Some(&[0.01; 3]));
+
+            // set matrix
+            shape.set_transform_matrix(transform);
+
             shape.draw(&mut target, &display);
             target.finish().unwrap();
         };
+
+        let start_time = std::time::Instant::now();
 
         // Handle window closing events (return) and New events from the OS (return or ignore)
         match event {
@@ -164,6 +184,18 @@ fn demo_3d(event_loop: EventLoop<()>, display: Display) {
             _ => return,
         }
 
-        
+        // How long has this pass taken?
+        let elapsed_time = std::time::Instant::now().duration_since(start_time).as_millis() as u64;
+
+        // How long should we wait for to run at 60 fps?
+        let wait_millis = match 1000 / TARGET_FPS >= elapsed_time {
+            true => 1000 / TARGET_FPS - elapsed_time,
+            false => 0
+        };
+        let new_inst = start_time + std::time::Duration::from_millis(wait_millis);
+        // Wait that long
+        *control_flow =  glutin::event_loop::ControlFlow::WaitUntil(new_inst);
+        // Update time
+        t += delta;
     });
 }
