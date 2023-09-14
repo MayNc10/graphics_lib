@@ -1,7 +1,7 @@
 use glium::{self, implement_vertex, Surface, Frame, uniform, uniforms::{UniformsStorage, EmptyUniforms}, Display};
 use image;
 
-use crate::matrix::{IDENTITY, Matrix};
+use crate::matrix::*;
 use super::triangulate::*;
 
 // This is a vertex that defines its own color
@@ -34,11 +34,11 @@ pub struct Shape {
     // These verticles are absolute for now, but we should make them relative to the Shape's position
     vertices: VertexContainer, // the vertices shouldn't change, so we use a Box<[]> for performance
     // TODO: Add rotation stuff
-    transform_matrix: Matrix,
+    transform_matrix: Mat4,
 }
 
 impl Shape {
-    pub fn new_convex_color(poly_vertices: &[ColorVertex], display: &Display, transform: Option<&Matrix>) -> Shape {
+    pub fn new_convex_color(poly_vertices: &[ColorVertex], display: &Display, transform: Option<&Mat4>) -> Shape {
         // We assume that the given shape is convex
 
         let shape = triangulate_simple_polygon_color(poly_vertices);
@@ -48,7 +48,7 @@ impl Shape {
     }
 
     pub fn new_convex_texture(poly_vertices: &[TextureVertex], display: &Display, 
-            bytes: &[u8], format: image::ImageFormat, transform: Option<&Matrix>) -> Shape {
+            bytes: &[u8], format: image::ImageFormat, transform: Option<&Mat4>) -> Shape {
         // We assume that the given shape is convex
         let shape = triangulate_simple_polygon_texture(poly_vertices);
 
@@ -63,7 +63,7 @@ impl Shape {
     }
 
     /// This is unsafe because the user has to guarantee that the shape is actually convex
-    pub unsafe fn new_convex_unchecked_color(poly_vertices: &[ColorVertex], display: &Display, transform: Option<&Matrix>) -> Shape {
+    pub unsafe fn new_convex_unchecked_color(poly_vertices: &[ColorVertex], display: &Display, transform: Option<&Mat4>) -> Shape {
         // We assume that the given shape is convex
 
         let shape = triangulate_convex_color(poly_vertices);
@@ -74,7 +74,7 @@ impl Shape {
 
     /// This is unsafe because the user has to guarantee that the shape is actually convex
     pub unsafe fn new_convex_unchecked_texture(poly_vertices: &[TextureVertex], display: &Display, 
-            bytes: &[u8], format: image::ImageFormat, transform: Option<&Matrix>) -> Shape {
+            bytes: &[u8], format: image::ImageFormat, transform: Option<&Mat4>) -> Shape {
         // We assume that the given shape is convex
         let shape = triangulate_convex_texture(poly_vertices);
 
@@ -90,10 +90,10 @@ impl Shape {
 }
 
 impl Shape {
-    pub fn set_transform_matrix(&mut self, mat: Matrix) {
+    pub fn set_transform_matrix(&mut self, mat: Mat4) {
         self.transform_matrix = mat;
     }
-    pub fn get_transform(&mut self) -> &mut Matrix {
+    pub fn get_transform(&mut self) -> &mut Mat4 {
         &mut self.transform_matrix
     }
 }
@@ -176,7 +176,7 @@ impl Shape {
                 from_source(display, DEFAULT_COLOR_2D_SHADER, 
                         DEFAULT_COLOR_2D_FRAG_SHADER, None).unwrap();
 
-                let uniforms = uniform! {matrix: self.transform_matrix};
+                let uniforms = uniform! {matrix: self.transform_matrix.inner};
 
                 frame.draw(vb, &indices, &program, &uniforms,
                     &Default::default()).unwrap();
@@ -187,7 +187,7 @@ impl Shape {
                 from_source(display, DEFAULT_TEXTURE_2D_SHADER, 
                         DEFAULT_TEXTURE_2D_FRAG_SHADER, None).unwrap();
 
-                let uniforms = uniform! {matrix: self.transform_matrix, tex: texture};
+                let uniforms = uniform! {matrix: self.transform_matrix.inner, tex: texture};
 
                 frame.draw(vb, &indices, &program, &uniforms,
                     &Default::default()).unwrap();
