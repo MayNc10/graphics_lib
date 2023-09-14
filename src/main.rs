@@ -243,14 +243,19 @@ fn demo_3d_scene(event_loop: EventLoop<()>, display: Display) {
 
     let scaling_func = |t: f32| {0.01 + 0.005 * t.cos()};
     let scaling_animation = 
-        Box::new(animation::Scaling {x_func: Some(scaling_func), y_func: Some(scaling_func), z_func: None}) as Box<dyn animation::Animation>;   
+        Box::new(animation::Scaling {x_func: Some(scaling_func), y_func: Some(scaling_func), z_func: Some(scaling_func)}) as Box<dyn animation::Animation>;   
 
-    let translate_func = |_t: f32| {0.7};
+    let translate_func = |t: f32| {0.7 * t.sin()};
+    let z_translate_func = |t: f32| {2.0 + 0.7 * t.cos()};
     let translate_animation = 
-        Box::new(animation::Translation {x_func: Some(translate_func), y_func: None, z_func: None}) as Box<dyn animation::Animation>;   
+        Box::new(animation::Translation {x_func: Some(translate_func), y_func: None, z_func: Some(z_translate_func)}) as Box<dyn animation::Animation>;   
 
     let animation = 
-        Box::new(animation::Composite {scaling: None, rotation: Some(rotation_animation), translation: Some(translate_animation)}) as Box<dyn animation::Animation>;
+        Box::new(animation::Composite {
+            scaling: None, 
+            rotation: Some(rotation_animation), 
+            translation: Some(translate_animation)}
+        ) as Box<dyn animation::Animation>;
 
     let mut shape = three_d::shape::Shape::new(positions, normals, indices, 
             three_d::shaders::ShaderType::BlinnPhong, None, Some(animation), false);
