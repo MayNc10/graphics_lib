@@ -4,16 +4,18 @@ use image;
 use crate::matrix::*;
 use super::{shaders, animation::Animation};
 
+pub mod importing;
+
 const FOV: f32 = std::f32::consts::PI / 3.0;
 const ZFAR: f32 = 1024.0;
 const ZNEAR: f32 = 0.1;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Vertex {
     pub position: (f32, f32, f32)
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Normal {
     pub normal: (f32, f32, f32)
 }

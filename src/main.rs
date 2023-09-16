@@ -253,20 +253,25 @@ fn demo_3d_scene(event_loop: EventLoop<()>, display: Display) {
     let animation = 
         Box::new(animation::Composite {
             scaling: None, 
-            rotation: Some(rotation_animation), 
+            rotation: None,//Some(rotation_animation), 
             translation: Some(translate_animation)}
         ) as Box<dyn animation::Animation>;
 
     let mut shape = three_d::shape::Shape::new(positions, normals, indices, 
             three_d::shaders::ShaderType::BlinnPhong, None, Some(animation), false);
 
-    
+    let mut square = three_d::shape::Shape::from_obj("media\\monkey.obj", 
+        three_d::shaders::ShaderType::BlinnPhong, &display, None, Some(rotation_animation), false).unwrap();
     
     // Scale down shape
     shape.set_transform_matrix(Some(generate_scale(&[0.01; 3])), None, 
         Some(generate_translate(None, None, Some(2.0))));
 
-    let id = scene.add_shape(shape);
+    square.set_scaling(generate_scale(&[0.3; 3]));
+    square.set_translation(generate_translate(None, None, Some(2.0)));
+
+    //let _id = scene.add_shape(shape);
+    let _id = scene.add_shape(square);
 
     // t is our start time, delta is what we increase it by each time
     let mut t: f32 = 0.0;
