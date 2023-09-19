@@ -80,13 +80,18 @@ impl Shape {
                     // Closure to create a new index
                     let mut add_idx = |v: usize, n: usize| {
                         // If we already have this vertex/normal pair, just reuse it
+                        
                         let mut new_idx = None;
-                        for &idx in &indices {
-                            if (vertices[v], normals[n]) == (vertices_out[idx as usize], normals_out[idx as usize]) {
-                                new_idx = Some(idx);
+                        for i in 0..indices.len() {
+                            let idx = indices[i] as usize;
+                            if (vertices[v], normals[n]) == (vertices_out[idx], normals_out[idx]) {
+                                new_idx = Some(indices[i]);
                                 break;
                             }
                         }
+                        
+                         
+
                         if new_idx.is_none() {
                             // Make a new pair and add it
                             vertices_out.push(vertices[v]);

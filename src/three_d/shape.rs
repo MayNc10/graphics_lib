@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use glium::{self, implement_vertex, Surface, Frame, uniform, uniforms::{UniformsStorage, EmptyUniforms}, Display, VertexBuffer, IndexBuffer};
 use image;
 
@@ -9,6 +11,8 @@ pub mod importing;
 const FOV: f32 = std::f32::consts::PI / 3.0;
 const ZFAR: f32 = 1024.0;
 const ZNEAR: f32 = 0.1;
+
+//const EPSILON: f32 = 1e-3;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Vertex {
