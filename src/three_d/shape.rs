@@ -7,6 +7,7 @@ use crate::matrix::*;
 use super::{shaders, animation::Animation};
 
 pub mod importing;
+use importing::*;
 
 const FOV: f32 = std::f32::consts::PI / 3.0;
 const ZFAR: f32 = 1024.0;
@@ -27,6 +28,7 @@ pub struct Normal {
 implement_vertex!(Vertex, position);
 implement_vertex!(Normal, normal);
 
+#[derive(Clone, Copy)]
 pub struct Transform {
     pub transform_matrix: Mat4,
     pub rotation_matrix: Mat4,
@@ -91,11 +93,14 @@ pub struct Shape {
     pub shader_type: shaders::ShaderType,
     bface_culling: glium::draw_parameters::BackfaceCullingMode,
 
+    material: Material,
+
 }
 
 impl Shape {
     pub fn new(positions: VertexBuffer<Vertex>, normals: VertexBuffer<Normal>, indices: IndexBuffer<u16>, 
-            shader_type: shaders::ShaderType, transform: Option<Transform>, animation: Option<Box<dyn Animation>>, bface_culling: bool) -> Shape {
+            shader_type: shaders::ShaderType, transform: Option<Transform>, animation: Option<Box<dyn Animation>>, bface_culling: bool, 
+            material: Material) -> Shape {
 
         let bface_culling = if bface_culling {
             glium::draw_parameters::BackfaceCullingMode::CullClockwise
@@ -103,7 +108,7 @@ impl Shape {
             glium::draw_parameters::BackfaceCullingMode::CullingDisabled
         };
 
-        Shape { positions , normals, indices, transform: transform.unwrap_or_default(), animation, shader_type, bface_culling}
+        Shape { positions , normals, indices, transform: transform.unwrap_or_default(), animation, shader_type, bface_culling, material}
     }
 }
 
@@ -115,6 +120,9 @@ impl Shape {
     }
     pub fn replace_animation(&mut self, animation: Box<dyn Animation>) {
         self.animation = Some(animation);
+    }
+    pub fn set_material(&mut self, mat: Material) {
+        self.material = mat;
     }
 }
 
@@ -164,10 +172,24 @@ impl Shape {
             ]
         };
 
-        let uniforms = uniform! {
+        if self.shader_type != shaders::ShaderType::BlinnPhong {
+            let uniforms = uniform! {
                 model: self.transform.transform_matrix.inner, view: view.inner, perspective: perspective, u_light: *light};
 
-        frame.draw((&self.positions , &self.normals), &self.indices, program, &uniforms,
+            frame.draw((&self.positions , &self.normals), &self.indices, program, &uniforms,
             &params).unwrap();
+        } else {
+            let uniforms = uniform! {
+                model: self.transform.transform_matrix.inner, view: view.inner, perspective: perspective, u_light: *light, 
+                    ambient_color: self.material.ambient_color, 
+                    diffuse_color: self.material.diffuse_color, 
+                    specular_color: self.material.specular_color, 
+                    specular_exp: self.material.specular_exp};
+
+            frame.draw((&self.positions , &self.normals), &self.indices, program, &uniforms,
+            &params).unwrap();
+        }
+
+        
     }
 }

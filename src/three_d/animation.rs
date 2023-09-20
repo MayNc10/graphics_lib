@@ -2,16 +2,33 @@ use crate::matrix::*;
 
 use super::shape::Transform;
 
-pub trait Animation {
+// TODO: This should like. Just be a closure. Too complictacated imo.
+pub trait Animation : AnimationClone {
     fn run(&mut self, t: f32, transform: &mut Transform);
 }
 
+pub trait AnimationClone {
+    fn clone_box(&self) -> Box<dyn Animation>;
+}
+
+impl<T> AnimationClone for T 
+where 
+    T: 'static + Animation + Clone,
+{
+    fn clone_box(&self) -> Box<dyn Animation> {
+        Box::new(self.clone())
+    }
+}
+
+
+#[derive(Clone)]
 pub enum RotationType {
     X,
     Y,
     Z,
 }
 
+#[derive(Clone)]
 pub struct ConstantRotation {
     pub ty: RotationType,
     pub secs_per_loop: f32 
@@ -30,6 +47,7 @@ impl Animation for ConstantRotation {
     }
 }
 
+#[derive(Clone)]
 pub struct Rotation {
     pub ty: RotationType,
     pub angle_func: fn(f32) -> f32,
@@ -49,6 +67,7 @@ impl Animation for Rotation {
     }
 }
 
+#[derive(Clone)]
 pub struct Scaling {
     pub x_func: Option<fn(f32) -> f32>,
     pub y_func: Option<fn(f32) -> f32>,
@@ -69,10 +88,27 @@ impl Animation for Scaling {
 // We don't have a good way of combining animations of the same type, so for now we just have one of each
 /// This struct expects that each animation has a type corresponding to its name
 /// E.G. the 'scaling' animation scales the shape
+//#[derive(Clone)]
 pub struct Composite {
     pub scaling: Option<Box<dyn Animation>>,
     pub rotation: Option<Box<dyn Animation>>,
     pub translation: Option<Box<dyn Animation>>,
+}
+
+impl Clone for Composite {
+    fn clone(&self) -> Self {
+        let new_scaling = if let Some(b) = &self.scaling {
+            Some(b.clone_box())
+        } else { None };
+        let new_rotation = if let Some(b) = &self.rotation {
+            Some(b.clone_box())
+        } else { None };
+        let new_translation= if let Some(b) = &self.translation {
+            Some(b.clone_box())
+        } else { None };
+
+        Composite { scaling: new_scaling, rotation: new_rotation, translation: new_translation }
+    }
 }
 
 impl Animation for Composite {
@@ -89,6 +125,7 @@ impl Animation for Composite {
     }
 }
 
+#[derive(Clone)]
 pub struct Translation {
     pub x_func: Option<fn(f32) -> f32>,
     pub y_func: Option<fn(f32) -> f32>,

@@ -141,12 +141,10 @@ fn demo_3d(event_loop: EventLoop<()>, display: Display) {
     let positions  = glium::VertexBuffer::new(&display, &teapot::VERTICES).unwrap();
     let normals = glium::VertexBuffer::new(&display, &teapot::NORMALS).unwrap();
     let indices = glium::IndexBuffer::new(&display, glium::index::PrimitiveType::TrianglesList,
-                                        &teapot::INDICES).unwrap();
-
-
+                                        &teapot::INDICES).unwrap();    
     
     let mut shape = three_d::shape::Shape::new(positions, normals, indices, 
-        three_d::shaders::ShaderType::BlinnPhong, None, None, false);
+        three_d::shaders::ShaderType::BlinnPhong, None, None, false, three_d::shape::importing::MAT);
     // Scale down shape
     shape.set_transform_matrix(Some(generate_scale(&[0.01; 3])), None, 
         Some(generate_translate(None, None, Some(2.0))));
@@ -227,51 +225,42 @@ fn demo_3d_scene(event_loop: EventLoop<()>, display: Display) {
 
     let mut scene = three_d::scene::Scene::new(view, light, &display);
 
-    let positions  = glium::VertexBuffer::new(&display, &teapot::VERTICES).unwrap();
-    let normals = glium::VertexBuffer::new(&display, &teapot::NORMALS).unwrap();
-    let indices = glium::IndexBuffer::new(
-        &display, 
-        glium::index::PrimitiveType::TrianglesList, 
-        &teapot::INDICES).unwrap();
-    
-    //let animation = 
-    //    Box::new(animation::ConstantRotation {ty: animation::RotationType::Y, secs_per_loop: 5.0}) as Box<dyn animation::Animation>;
+    //let positions  = glium::VertexBuffer::new(&display, &teapot::VERTICES).unwrap();
+    //let normals = glium::VertexBuffer::new(&display, &teapot::NORMALS).unwrap();
+    //let indices = glium::IndexBuffer::new(
+    //    &display, 
+    //    glium::index::PrimitiveType::TrianglesList, 
+    //    &teapot::INDICES).unwrap();
 
-    let angle_func = |t: f32| { (t / 5.0) * 360.0 }; //{ ((t / 2.0).cos() + 3.0) * 90.0 };
+    let angle_func = |t: f32| { (t / 5.0) * 360.0 };
     let rotation_animation = 
-        Box::new(animation::Rotation {ty: animation::RotationType::Y, angle_func}) as Box<dyn animation::Animation>;
+        Box::new(animation::Rotation {ty: animation::RotationType::Y, angle_func}) as Box<dyn animation::Animation>;  
 
-    let scaling_func = |t: f32| {0.01 + 0.005 * t.cos()};
-    let scaling_animation = 
-        Box::new(animation::Scaling {x_func: Some(scaling_func), y_func: Some(scaling_func), z_func: Some(scaling_func)}) as Box<dyn animation::Animation>;   
+    let mut monkey = three_d::shape::Shape::from_obj("media\\monkey.obj", 
+        three_d::shaders::ShaderType::BlinnPhong, 
+        &display, 
+        None, 
+        Some(rotation_animation), 
+        false).unwrap().pop().unwrap();
 
-    let translate_func = |t: f32| {0.7 * t.sin()};
-    let z_translate_func = |t: f32| {2.0 + 0.7 * t.cos()};
-    let translate_animation = 
-        Box::new(animation::Translation {x_func: Some(translate_func), y_func: None, z_func: Some(z_translate_func)}) as Box<dyn animation::Animation>;   
+    let angle_func = |t: f32| { (t / 5.0) * 360.0 };
+    let rotation_animation = 
+        Box::new(animation::Rotation {ty: animation::RotationType::X, angle_func}) as Box<dyn animation::Animation>;  
 
-    let animation = 
-        Box::new(animation::Composite {
-            scaling: None, 
-            rotation: None,//Some(rotation_animation), 
-            translation: Some(translate_animation)}
-        ) as Box<dyn animation::Animation>;
+    let mut torus = three_d::shape::Shape::from_obj("media\\torus.obj", 
+        three_d::shaders::ShaderType::BlinnPhong, 
+        &display, 
+        None, 
+        Some(rotation_animation), 
+        false).unwrap().pop().unwrap();
 
-    let mut shape = three_d::shape::Shape::new(positions, normals, indices, 
-            three_d::shaders::ShaderType::BlinnPhong, None, Some(animation), false);
+    monkey.set_scaling(generate_scale(&[0.3; 3]));
+    monkey.set_translation(generate_translate(Some(0.5), None, Some(2.0)));
+    scene.add_shape(monkey);
 
-    let mut square = three_d::shape::Shape::from_obj("media\\monkey.obj", 
-        three_d::shaders::ShaderType::BlinnPhong, &display, None, Some(rotation_animation), false).unwrap();
-    
-    // Scale down shape
-    shape.set_transform_matrix(Some(generate_scale(&[0.01; 3])), None, 
-        Some(generate_translate(None, None, Some(2.0))));
-
-    square.set_scaling(generate_scale(&[0.3; 3]));
-    square.set_translation(generate_translate(None, None, Some(2.0)));
-
-    //let _id = scene.add_shape(shape);
-    let _id = scene.add_shape(square);
+    torus.set_scaling(generate_scale(&[0.3; 3]));
+    torus.set_translation(generate_translate(Some(-0.5), None, Some(2.0)));
+    scene.add_shape(torus);
 
     // t is our start time, delta is what we increase it by each time
     let mut t: f32 = 0.0;
