@@ -7,6 +7,7 @@ use super::*;
 pub const MAT: Material = Material {
     ambient_color: [0.2, 0.0, 0.0],
     diffuse_color: [0.6, 0.0, 0.0],
+    emission_color: [0.0; 3],
     specular_color: [1.0, 1.0, 1.0],
     specular_exp: 16.0,
     transparency: 1.0,
@@ -246,6 +247,7 @@ pub enum IlluminationModel {
 pub struct Material {
     pub ambient_color: [f32; 3],
     pub diffuse_color: [f32; 3],
+    pub emission_color: [f32; 3],
     pub specular_color: [f32; 3],
     pub specular_exp: f32,
     pub transparency: f32,
@@ -258,7 +260,8 @@ pub const DEFAULT_SPEC_EXP: f32 = 16.0;
 
 impl Default for Material {
     fn default() -> Self {
-        Material { ambient_color: [0.0; 3], diffuse_color: [1.0; 3], specular_color: [0.0; 3], specular_exp: DEFAULT_SPEC_EXP, 
+        Material { ambient_color: [0.0; 3], diffuse_color: [1.0; 3], emission_color: [0.0; 3],
+            specular_color: [0.0; 3], specular_exp: DEFAULT_SPEC_EXP, 
             transparency: 1.0, transmission_filter_color: None, optical_density: None, illum_model: None}
     }
 }
@@ -276,7 +279,7 @@ impl Material {
         let mut current_mat: Option<Material> = None;
         let mut current_mat_name: Option<String> = None;
 
-        for line in lines {
+        'lines_loop: for line in lines {
             let mut tokens = line.split_ascii_whitespace();
             println!("{current_mat:?}");
 
@@ -315,6 +318,19 @@ impl Material {
 
                     current_mat.as_mut().unwrap().specular_color = [r, g, b];
                 },
+                "Ke" => {
+                    let r = tokens.next().unwrap().parse().unwrap();
+                    let g = tokens.next().unwrap().parse().unwrap();
+                    let b = tokens.next().unwrap().parse().unwrap();
+
+                    // I've seen this in a file and it does weird things
+                    if r > 1.0 || g > 1.0 || b > 1.0 {
+                        println!("WARNING: Emission color values greater than 1");
+                        continue 'lines_loop;
+                    }
+
+                    current_mat.as_mut().unwrap().emission_color = [r, g, b];
+                }
                 "Ns" => {
                     let exp = tokens.next().unwrap().parse().unwrap();
 

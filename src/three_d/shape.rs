@@ -183,6 +183,7 @@ impl Shape {
                 model: self.transform.transform_matrix.inner, view: view.inner, perspective: perspective, u_light: *light, 
                     ambient_color: self.material.ambient_color, 
                     diffuse_color: self.material.diffuse_color, 
+                    emission_color: self.material.emission_color,
                     specular_color: self.material.specular_color, 
                     specular_exp: self.material.specular_exp};
 
