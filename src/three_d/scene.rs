@@ -1,7 +1,9 @@
+use super::shape::Light;
 use super::shape::Shape;
 use super::shaders;
 use crate::matrix::Mat4;
 
+use glium::Display;
 use glium::Frame;
 use glium::Program;
 
@@ -11,11 +13,11 @@ pub struct Scene {
     blinn_phong_shading: (Vec<Shape>, Program),
 
     view: Mat4,
-    light: [f32; 3],
+    light: Light,
 }
 
 impl Scene {
-    pub fn new(view: Mat4, light: [f32; 3], display: &glium::Display) -> Scene {
+    pub fn new(view: Mat4, light: Light, display: &glium::Display) -> Scene {
         let no_shading =  glium::Program::from_source(
             display, shaders::DEFAULT_3D_SHADER, 
             shaders::DEFAULT_3D_FRAG_SHADER, None

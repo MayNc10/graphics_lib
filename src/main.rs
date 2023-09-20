@@ -1,5 +1,5 @@
 use glium::{self, glutin::{self, event_loop::EventLoop, window::Window}, Surface, uniform, Display};
-use graphics_lib::two_d;
+use graphics_lib::{two_d, three_d::shape::Light};
 use graphics_lib::three_d;
 use graphics_lib::three_d::animation;
 use graphics_lib::matrix::*;
@@ -21,7 +21,7 @@ fn main() {
     let display = Display::new(wb, cb, &event_loop).unwrap();
     
     //demo_2d(event_loop, display);
-    demo_3d_scene(event_loop, display);
+    demo_3d(event_loop, display);
 }
 
 fn demo_2d(event_loop: EventLoop<()>, display: Display) {
@@ -123,104 +123,13 @@ fn demo_2d(event_loop: EventLoop<()>, display: Display) {
 fn demo_3d(event_loop: EventLoop<()>, display: Display) {
     // Create programs
 
-    let no_shading =  glium::Program::from_source(
-        &display, three_d::shaders::DEFAULT_3D_SHADER, 
-        three_d::shaders::DEFAULT_3D_FRAG_SHADER, None
-    ).unwrap();
+    let light = Light {
+        direction: [1.0; 3],
 
-    let gouraud = glium::Program::from_source(
-        &display, three_d::shaders::GOURAUD_3D_SHADER, 
-        three_d::shaders::GOURAUD_3D_FRAG_SHADER, None
-    ).unwrap();
-    
-    let blinn_phong = glium::Program::from_source(
-        &display, three_d::shaders::BLINN_PHONG_3D_SHADER, 
-        three_d::shaders::BLINN_PHONG_3D_FRAG_SHADER, None
-    ).unwrap();
-
-    let positions  = glium::VertexBuffer::new(&display, &teapot::VERTICES).unwrap();
-    let normals = glium::VertexBuffer::new(&display, &teapot::NORMALS).unwrap();
-    let indices = glium::IndexBuffer::new(&display, glium::index::PrimitiveType::TrianglesList,
-                                        &teapot::INDICES).unwrap();    
-    
-    let mut shape = three_d::shape::Shape::new(positions, normals, indices, 
-        three_d::shaders::ShaderType::BlinnPhong, None, None, false, three_d::shape::importing::MAT);
-    // Scale down shape
-    shape.set_transform_matrix(Some(generate_scale(&[0.01; 3])), None, 
-        Some(generate_translate(None, None, Some(2.0))));
-
-    // t is our start time, delta is what we increase it by each time
-    let mut t: f32 = 0.0;
-    let delta: f32 = 0.02;
-
-    let mut start_time = std::time::Instant::now();
-
-    // Create the main event loop
-    event_loop.run(move |event, _, control_flow| {
-        // Handle window closing events (return) and New events from the OS (return or ignore)
-        match event {
-            glutin::event::Event::WindowEvent { event, .. } => match event {
-                glutin::event::WindowEvent::CloseRequested => {
-                    *control_flow = glutin::event_loop::ControlFlow::Exit;
-                    return;
-                },
-                _ => return,
-            },
-            glutin::event::Event::NewEvents(cause) => match cause {
-                glutin::event::StartCause::ResumeTimeReached { .. } => (),
-                glutin::event::StartCause::Init => (),
-                _ => return,
-            },
-            glutin::event::Event::RedrawRequested(_) => {}
-            glutin::event::Event::RedrawEventsCleared => {}
-            _ => return,
-        }
-
-        // How long has this pass taken?
-        let elapsed_time = std::time::Instant::now().duration_since(start_time).as_millis() as u64;
-
-        // How long should we wait for to run at 60 fps?
-        let wait_millis = match 1000 / TARGET_FPS >= elapsed_time {
-            true => 1000 / TARGET_FPS - elapsed_time,
-            false => 0
-        };
-        if wait_millis != 0 {
-            let new_inst = start_time + std::time::Duration::from_millis(wait_millis);
-            // Wait that long
-            *control_flow =  glutin::event_loop::ControlFlow::WaitUntil(new_inst);
-            //println!("Hitting fps goal!");
-        }
-        else {
-            // Update time
-            t += delta;
-
-            // Create a drawing target
-            let mut target = display.draw();
-            target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);              
-
-            // Draw, using the vertexs, the shaders, and the matrix
-            // spin shape
-            let angle = (360.0 * (t / 5.0)) * std::f32::consts::PI / 180.0;
-            let rotation = generate_rotate_x(angle);
-
-            shape.set_rotation(rotation);
-
-            //shape.set_transform_matrix(transform);
-            // light direction
-            let light = [1.4, 0.4, -0.7f32];
-            let view = view_matrix(&[0.0, 0.0, 0.0], &[0.0, 0.0, 1.0], &[0.0, 1.0, 0.0]);
-            shape.draw(&mut target, &light, &view, &blinn_phong);
-            target.finish().unwrap();
-
-            start_time = std::time::Instant::now();
-        }
-    });
-}
-
-fn demo_3d_scene(event_loop: EventLoop<()>, display: Display) {
-    // Create programs
-
-    let light = [1.4, 0.4, -0.7f32];
+        ambient: [0.05; 3],
+        diffuse: [1.0; 3],
+        specular: [1.0; 3],
+    };
     let view = view_matrix(&[0.0, 0.0, 0.0], &[0.0, 0.0, 1.0], &[0.0, 1.0, 0.0]);
 
     let mut scene = three_d::scene::Scene::new(view, light, &display);

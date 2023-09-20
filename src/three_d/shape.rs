@@ -144,9 +144,25 @@ impl Shape {
     }
 }
 
+pub struct Light {
+    pub direction: [f32; 3],
+
+    pub ambient: [f32; 3],
+    pub diffuse: [f32; 3],
+    pub specular: [f32; 3],
+} 
+
+impl Light {
+    pub fn as_matrix(&self) -> Matrix {
+        [[self.direction[0], self.direction[1], self.direction[2], 0.0], 
+        [self.ambient[0], self.ambient[1], self.ambient[2], 0.0],  
+        [self.diffuse[0], self.diffuse[1], self.diffuse[2], 0.0], 
+        [self.specular[0], self.specular[1], self.specular[2], 0.0]]
+    }
+}
 
 impl Shape {
-    pub fn draw(&self, frame: &mut Frame, light: &[f32; 3], view: &Mat4, program: &glium::Program) {
+    pub fn draw(&self, frame: &mut Frame, light: &Light, view: &Mat4, program: &glium::Program) {
         let params = glium::DrawParameters {
             depth: glium::Depth {
                 test: glium::draw_parameters::DepthTest::IfLess, // When should we use pixel values? IfLess (than the value already there)
@@ -174,13 +190,13 @@ impl Shape {
 
         if self.shader_type != shaders::ShaderType::BlinnPhong {
             let uniforms = uniform! {
-                model: self.transform.transform_matrix.inner, view: view.inner, perspective: perspective, u_light: *light};
+                model: self.transform.transform_matrix.inner, view: view.inner, perspective: perspective, u_light: light.direction};
 
             frame.draw((&self.positions , &self.normals), &self.indices, program, &uniforms,
             &params).unwrap();
         } else {
             let uniforms = uniform! {
-                model: self.transform.transform_matrix.inner, view: view.inner, perspective: perspective, u_light: *light, 
+                model: self.transform.transform_matrix.inner, view: view.inner, perspective: perspective, u_light: light.as_matrix(), 
                     ambient_color: self.material.ambient_color, 
                     diffuse_color: self.material.diffuse_color, 
                     emission_color: self.material.emission_color,
