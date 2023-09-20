@@ -21,7 +21,6 @@ uniform float specular_exp;
 vec3 calc_dir_light(mat4 light, vec3 normal, vec3 viewdir);
 
 void main() {
-
     vec3 camera_dir = normalize(-v_position);
     vec3 view_dir = normalize(normalize(u_light[0].xyz) + camera_dir);
 
@@ -29,12 +28,11 @@ void main() {
 }
 
 vec3 calc_dir_light(mat4 light, vec3 normal, vec3 view_dir) {
-    vec3 light_dir = normalize(-light[0].xyz);
-    // diffuse shading
+    vec3 light_dir = normalize(light[0].xyz);
+    // Diffuse lighting
     float diff = max(dot(normal, light_dir), 0.0);
-    // specular shading
-    vec3 reflect_dir = reflect(-light_dir, normal);
-    float spec = pow(max(dot(view_dir, reflect_dir), 0.0), specular_exp);
+    // Specular lighting
+    float spec = pow(max(dot(view_dir, normal), 0.0), specular_exp);
     // combine results
     vec3 ambient  = light[1].xyz  * ambient_color;
     vec3 diffuse  = light[2].xyz  * diff * diffuse_color;
