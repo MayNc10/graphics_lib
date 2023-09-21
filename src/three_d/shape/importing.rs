@@ -164,7 +164,7 @@ impl Shape {
                         // We do that by averaging across each different axis
                         let mut center = [0.0; 3];
                         for idx in &indices {
-                            let (x, y, z) = vertices[*idx as usize].position;
+                            let (x, y, z) = vertices_out[*idx as usize].position;
                             center[0] += x;
                             center[1] += y;
                             center[2] += z;
@@ -218,7 +218,7 @@ impl Shape {
         // We do that by averaging across each different axis
         let mut center = [0.0; 3];
         for idx in &indices {
-            let (x, y, z) = vertices[*idx as usize].position;
+            let (x, y, z) = vertices_out[*idx as usize].position;
             center[0] += x;
             center[1] += y;
             center[2] += z;
