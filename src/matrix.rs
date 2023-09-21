@@ -3,6 +3,27 @@ use std::ops::{Mul, MulAssign};
 pub type Matrix = [[f32; 4]; 4];
 
 #[derive(Clone, Copy)]
+pub struct Vec4 {
+    pub inner: [f32; 4],
+}
+
+impl Vec4 {
+    pub fn new() -> Vec4 {
+        Vec4 { inner: [0.0; 4] }
+    }
+    pub fn from_v4(v4: [f32; 4]) -> Vec4 {
+        Vec4 { inner: v4 }
+    }
+    pub fn from_v3(v3: [f32; 3]) -> Vec4 {
+        let inner = [v3[0], v3[1], v3[2], 0.0];
+        Vec4 { inner }
+    }
+    pub fn to_v3(&self) -> [f32; 3] {
+        [self.inner[0], self.inner[1], self.inner[2]]
+    }
+}
+
+#[derive(Clone, Copy)]
 pub struct Mat4 {
     pub inner: Matrix,
 }
@@ -40,11 +61,32 @@ impl Mul for Mat4 {
     }
 }
 
+impl Mul<Vec4> for Mat4 {
+    type Output = Vec4;
+
+    fn mul(self, mut rhs: Vec4) -> Self::Output {
+        let calc_entry = |i: usize| {
+            let mut res = 0.0;
+            for n in 0..4 {
+                res += self.inner[i][n] * rhs.inner[n];
+            }
+            res
+        };
+
+        let mut v4 = [0.0; 4];
+        for i in 0..4 {
+            v4[i] = calc_entry(i);
+        }
+        Vec4::from_v4(v4)
+    }
+}
+
 impl MulAssign for Mat4 {
     fn mul_assign(&mut self, rhs: Self) {
         *self = *self * rhs;
     }
 }
+
 
 // Define an identity matrix
 pub const IDENTITY: Mat4 = Mat4 { inner: [

@@ -160,6 +160,19 @@ impl Shape {
                 "o" => {
                     // Have we actually parsed a shape yet?
                     if object_name.is_some() {
+                        // Before we turn this into buffer data, we would like to compute the center of this object
+                        // We do that by averaging across each different axis
+                        let mut center = [0.0; 3];
+                        for idx in &indices {
+                            let (x, y, z) = vertices[*idx as usize].position;
+                            center[0] += x;
+                            center[1] += y;
+                            center[2] += z;
+                        }
+                        center[0] /= indices.len() as f32;
+                        center[1] /= indices.len() as f32;
+                        center[2] /= indices.len() as f32;
+
                         let positions  = glium::VertexBuffer::new(display, &vertices_out).unwrap();
                         let normals_buffer = glium::VertexBuffer::new(display, &normals_out).unwrap();
                         let indices_buffer = glium::IndexBuffer::new(
@@ -174,13 +187,14 @@ impl Shape {
                         // Is there a material for this object?
                         let material = *mat_map.get(&material_name.unwrap_or_default()).unwrap_or(&Material::default());
 
+
                         let s = Shape {positions, normals: normals_buffer, indices: indices_buffer, 
                             transform: transform.unwrap_or_default(), 
                             animation: new_animation, shader_type, 
                             bface_culling: match bface_culling {
                                 true => glium::BackfaceCullingMode::CullClockwise,
                                 false => glium::BackfaceCullingMode::CullingDisabled,
-                        }, material};
+                        }, material, center: Some(center)};
                         shapes.push(s);
 
                         // We don't clear the vertices or normals lists
@@ -200,6 +214,19 @@ impl Shape {
             }
         }
 
+        // Before we turn this into buffer data, we would like to compute the center of this object
+        // We do that by averaging across each different axis
+        let mut center = [0.0; 3];
+        for idx in &indices {
+            let (x, y, z) = vertices[*idx as usize].position;
+            center[0] += x;
+            center[1] += y;
+            center[2] += z;
+        }
+        center[0] /= indices.len() as f32;
+        center[1] /= indices.len() as f32;
+        center[2] /= indices.len() as f32;
+
         let positions  = glium::VertexBuffer::new(display, &vertices_out).unwrap();
         let normals_buffer = glium::VertexBuffer::new(display, &normals_out).unwrap();
         let indices_buffer = glium::IndexBuffer::new(
@@ -216,7 +243,7 @@ impl Shape {
             bface_culling: match bface_culling {
                 true => glium::BackfaceCullingMode::CullClockwise,
                 false => glium::BackfaceCullingMode::CullingDisabled,
-        }, material};
+        }, material, center: Some(center)};
         shapes.push(s);
 
         Ok(shapes)
