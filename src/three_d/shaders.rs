@@ -1,3 +1,5 @@
+use glium::Program;
+
 // Shader types
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ShaderType {
@@ -24,5 +26,3 @@ pub const GOURAUD_3D_FRAG_SHADER: &str = include_str!("shaders/gouraud_frag.glsl
 pub const BLINN_PHONG_3D_SHADER: &str = include_str!("shaders/blinn_phong.glsl");
 
 pub const BLINN_PHONG_3D_FRAG_SHADER: &str = include_str!("shaders/blinn_phong_frag.glsl");
-
-pub const BLINN_PHONG_3D_FRAG_10_LIGHTS_SHADER: &str = include_str!("shaders/blinn_phong_frag_10_lights.glsl");

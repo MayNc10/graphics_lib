@@ -2,7 +2,6 @@ use super::shape::Light;
 use super::shape::Shape;
 use super::shaders;
 use crate::matrix::Mat4;
-use crate::matrix::Vec4;
 
 use glium::Display;
 use glium::Frame;
@@ -31,7 +30,7 @@ impl Scene {
         
         let blinn_phong_shading = glium::Program::from_source(
             display, shaders::BLINN_PHONG_3D_SHADER, 
-            shaders::BLINN_PHONG_3D_FRAG_10_LIGHTS_SHADER, None
+            shaders::BLINN_PHONG_3D_FRAG_SHADER, None
         ).unwrap();
 
         Scene 
@@ -64,90 +63,20 @@ impl Scene {
 }
 
 impl Scene {
-    pub fn draw(&mut self, frame: &mut Frame, t: f32, display: &Display) {
-        // Find all the lights in the scene
-        // FIXME: Get actual values for ambient, diffuse, and spectral, instead of hardcoding them
-        let mut point_lights = Vec::new();
+    pub fn draw(&mut self, frame: &mut Frame, t: f32) {
         for shape in &mut self.no_shading.0 {
-            shape.animate(t); // Animate to have an updated position
-
-            let emission = shape.get_material().emission_color;
-            println!("{}, {emission:?}", shape.center.is_some());
-            // If the shape doesn't have a provided center, we can't calculate one (all the data is in the buffers)
-            // So we just ignore it
-            if let Some(center) = shape.center && (emission[0] > 0.0 || emission[1] > 0.0 || emission[2] > 0.0) {
-                // This shape has positive emmision, so it emits light!
-                // To get the actual center of the light, we have to scale it by the shapes transform matrix
-                // First, this means making our vector 4-long
-                let center4 = Vec4::from_v3(center);
-                let transformed_center = shape.get_transform_matrix().transform_matrix * center4;
-
-                point_lights.push(Light {
-                    direction: transformed_center.to_v3(),
-                    ambient: [0.0; 3],
-                    diffuse: [1.0; 3],
-                    specular: [1.0; 3],
-                });
-            }
+            shape.animate(t);
+            shape.draw(frame, &self.light, &self.view, &self.no_shading.1);
         }
 
         for shape in &mut self.gouraud_shading.0 {
-            shape.animate(t); // Animate to have an updated position
-
-            let emission = shape.get_material().emission_color;
-            println!("{}, {emission:?}", shape.center.is_some());
-            // If the shape doesn't have a provided center, we can't calculate one (all the data is in the buffers)
-            // So we just ignore it
-            if let Some(center) = shape.center && (emission[0] > 0.0 || emission[1] > 0.0 || emission[2] > 0.0) {
-                // This shape has positive emmision, so it emits light!
-                // To get the actual center of the light, we have to scale it by the shapes transform matrix
-                // First, this means making our vector 4-long
-                let center4 = Vec4::from_v3(center);
-                let transformed_center = shape.get_transform_matrix().transform_matrix * center4;
-
-                point_lights.push(Light {
-                    direction: transformed_center.to_v3(),
-                    ambient: [0.0; 3],
-                    diffuse: [1.0; 3],
-                    specular: [1.0; 3],
-                });
-            }
+            shape.animate(t);
+            shape.draw(frame, &self.light, &self.view, &self.gouraud_shading.1);
         }
 
         for shape in &mut self.blinn_phong_shading.0 {
-            shape.animate(t); // Animate to have an updated position
-
-            let emission = shape.get_material().emission_color;
-            println!("{}, {emission:?}", shape.center.is_some());
-            // If the shape doesn't have a provided center, we can't calculate one (all the data is in the buffers)
-            // So we just ignore it
-            if let Some(center) = shape.center && (emission[0] > 0.0 || emission[1] > 0.0 || emission[2] > 0.0) {
-                // This shape has positive emmision, so it emits light!
-                // To get the actual center of the light, we have to scale it by the shapes transform matrix
-                // First, this means making our vector 4-long
-                let center4 = Vec4::from_v3(center);
-                let transformed_center = shape.get_transform_matrix().transform_matrix * center4;
-
-                point_lights.push(Light {
-                    direction: transformed_center.to_v3(),
-                    ambient: [0.0; 3],
-                    diffuse: [1.0; 3],
-                    specular: [1.0; 3],
-                });
-            }
-        }
-
-        // Draw all the shapes
-        for shape in &mut self.no_shading.0 {
-            shape.draw(frame, &self.light, &self.view, &self.no_shading.1, &point_lights, display);
-        }
-
-        for shape in &mut self.gouraud_shading.0 {
-            shape.draw(frame, &self.light, &self.view, &self.gouraud_shading.1, &point_lights, display);
-        }
-
-        for shape in &mut self.blinn_phong_shading.0 {
-            shape.draw(frame, &self.light, &self.view, &self.blinn_phong_shading.1, &point_lights, display);
+            shape.animate(t);
+            shape.draw(frame, &self.light, &self.view, &self.blinn_phong_shading.1);
         }
     }
 }

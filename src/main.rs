@@ -124,7 +124,7 @@ fn demo_3d(event_loop: EventLoop<()>, display: Display) {
     // Create programs
 
     let light = Light {
-        direction:  [1.4, 0.4, -0.7f32],
+        direction: [1.0; 3],
 
         ambient: [0.05; 3],
         diffuse: [1.0; 3],
@@ -156,7 +156,7 @@ fn demo_3d(event_loop: EventLoop<()>, display: Display) {
     let rotation_animation = 
         Box::new(animation::Rotation {ty: animation::RotationType::X, angle_func}) as Box<dyn animation::Animation>;  
 
-    let mut sphere = three_d::shape::Shape::from_obj("media\\sphere.obj", 
+    let mut torus = three_d::shape::Shape::from_obj("media\\torus.obj", 
         three_d::shaders::ShaderType::BlinnPhong, 
         &display, 
         None, 
@@ -167,9 +167,9 @@ fn demo_3d(event_loop: EventLoop<()>, display: Display) {
     monkey.set_translation(generate_translate(Some(0.5), None, Some(2.0)));
     scene.add_shape(monkey);
 
-    sphere.set_scaling(generate_scale(&[0.3; 3]));
-    sphere.set_translation(generate_translate(Some(-0.5), None, Some(2.0)));
-    scene.add_shape(sphere);
+    torus.set_scaling(generate_scale(&[0.3; 3]));
+    torus.set_translation(generate_translate(Some(-0.5), None, Some(2.0)));
+    scene.add_shape(torus);
 
     // t is our start time, delta is what we increase it by each time
     let mut t: f32 = 0.0;
@@ -221,7 +221,7 @@ fn demo_3d(event_loop: EventLoop<()>, display: Display) {
             let mut target = display.draw();
             target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);              
 
-            scene.draw(&mut target, t, &display);
+            scene.draw(&mut target, t);
 
             target.finish().unwrap();
 

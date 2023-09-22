@@ -1,6 +1,6 @@
-use std::{hash::Hash, any::Any};
+use std::hash::Hash;
 
-use glium::{self, implement_vertex, Surface, Frame, uniform, uniforms::{UniformsStorage, EmptyUniforms, Uniforms, UniformBuffer}, Display, VertexBuffer, IndexBuffer, implement_buffer_content, implement_uniform_block};
+use glium::{self, implement_vertex, Surface, Frame, uniform, uniforms::{UniformsStorage, EmptyUniforms}, Display, VertexBuffer, IndexBuffer};
 use image;
 
 use crate::matrix::*;
@@ -83,9 +83,9 @@ impl Default for Transform {
 }
 
 pub struct Shape {
-    pub positions : VertexBuffer<Vertex>,
-    pub normals: VertexBuffer<Normal>,
-    pub indices: IndexBuffer<u16>,
+    positions : VertexBuffer<Vertex>,
+    normals: VertexBuffer<Normal>,
+    indices: IndexBuffer<u16>,
 
     transform: Transform,
     animation: Option<Box<dyn Animation>>,
@@ -95,7 +95,6 @@ pub struct Shape {
 
     material: Material,
 
-    pub center: Option<[f32; 3]>
 }
 
 impl Shape {
@@ -109,7 +108,7 @@ impl Shape {
             glium::draw_parameters::BackfaceCullingMode::CullingDisabled
         };
 
-        Shape { positions , normals, indices, transform: transform.unwrap_or_default(), animation, shader_type, bface_culling, material, center: None}
+        Shape { positions , normals, indices, transform: transform.unwrap_or_default(), animation, shader_type, bface_culling, material}
     }
 }
 
@@ -125,20 +124,12 @@ impl Shape {
     pub fn set_material(&mut self, mat: Material) {
         self.material = mat;
     }
-    pub fn get_material(&self) -> &Material {
-        &self.material
-    }
 }
 
 impl Shape {
     pub fn set_transform_matrix(&mut self, scaling: Option<Mat4>, rotation: Option<Mat4>, translation: Option<Mat4> ) {
         self.transform.set_transform_matrix(scaling, rotation, translation);
     }
-
-    pub fn get_transform_matrix(&mut self) -> &Transform {
-        &self.transform
-    }
-    
 
     pub fn set_scaling(&mut self, scaling: Mat4) {
         self.transform.set_scaling(scaling)
@@ -153,7 +144,6 @@ impl Shape {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
 pub struct Light {
     pub direction: [f32; 3],
 
@@ -171,16 +161,8 @@ impl Light {
     }
 }
 
-impl Default for Light {
-    fn default() -> Self {
-        Light { direction: [0.0; 3], ambient: [0.0; 3], diffuse: [0.0; 3], specular: [0.0; 3]}
-    }
-}
-
-implement_uniform_block!(Light, direction, ambient, diffuse, specular);
-
 impl Shape {
-    pub fn draw(&self, frame: &mut Frame, light: &Light, view: &Mat4, program: &glium::Program, point_lights: &[Light], display: &Display) {
+    pub fn draw(&self, frame: &mut Frame, light: &Light, view: &Mat4, program: &glium::Program) {
         let params = glium::DrawParameters {
             depth: glium::Depth {
                 test: glium::draw_parameters::DepthTest::IfLess, // When should we use pixel values? IfLess (than the value already there)
@@ -213,29 +195,14 @@ impl Shape {
             frame.draw((&self.positions , &self.normals), &self.indices, program, &uniforms,
             &params).unwrap();
         } else {
-            let uniform_directional_lights: UniformBuffer<[[[f32; 4]; 4]; 10]> 
-                = glium::uniforms::UniformBuffer::empty_dynamic(display).unwrap();
-
-            let mut point_light_data = [[[0.0; 4]; 4]; 10];
-            for idx in 0..10.min(point_lights.len()) {
-                point_light_data[idx] = point_lights[idx].as_matrix();
-            }
-            println!("{:?}", point_light_data);
-            //point_light_data[9] = light.as_matrix();
-            uniform_directional_lights.write(&point_light_data);
-
             let uniforms = uniform! {
-                model: self.transform.transform_matrix.inner, 
-                view: view.inner, 
-                perspective: perspective, 
-                u_light: light.as_matrix(), 
-                point_lights: &uniform_directional_lights,
-                ambient_color: self.material.ambient_color, 
-                diffuse_color: self.material.diffuse_color, 
-                emission_color: self.material.emission_color,
-                specular_color: self.material.specular_color, 
-                specular_exp: self.material.specular_exp
-            };
+                model: self.transform.transform_matrix.inner, view: view.inner, perspective: perspective, u_light: light.as_matrix(), 
+                    ambient_color: self.material.ambient_color, 
+                    diffuse_color: self.material.diffuse_color, 
+                    emission_color: self.material.emission_color,
+                    specular_color: self.material.specular_color, 
+                    specular_exp: self.material.specular_exp};
+
             frame.draw((&self.positions , &self.normals), &self.indices, program, &uniforms,
             &params).unwrap();
         }
