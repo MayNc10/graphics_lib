@@ -8,6 +8,7 @@ use image;
 
 use crate::matrix::*;
 use super::shaders::Program;
+use super::shaders::ShaderType;
 use super::{shaders, animation::Animation, buffer::*, VAO::*};
 
 pub mod importing;
@@ -76,17 +77,17 @@ impl Default for Transform {
 pub struct Shape {
     vao: VertexArrayObject,
 
-    pub positions: VertexBuffer,
-    pub normals: NormalBuffer,
-    pub indices: IndexBuffer,
+    positions: VertexBuffer,
+    normals: NormalBuffer,
+    indices: IndexBuffer,
 
-    pub transform: Transform,
+    transform: Transform,
     animation: Option<Box<dyn Animation>>,
 
-    pub shader_type: shaders::ShaderType,
+    shader_type: shaders::ShaderType,
     //bface_culling: glium::draw_parameters::BackfaceCullingMode,
 
-    material: Material,
+    pub material: Material,
 
 }
 
@@ -214,18 +215,36 @@ impl Shape {
             let perspective_handle = gl::GetUniformLocation(program.0, CString::new("perspective").unwrap().as_ptr());
             let view_handle = gl::GetUniformLocation(program.0, CString::new("view").unwrap().as_ptr());
             let model_handle = gl::GetUniformLocation(program.0, CString::new("model").unwrap().as_ptr());
-            let light_handle = gl::GetUniformLocation(program.0, CString::new("u_light").unwrap().as_ptr());
             // Bind matrix data to uniforms
             gl::UniformMatrix4fv(perspective_handle, 1, gl::FALSE, perspective.as_ptr() as *const GLfloat);
             gl::UniformMatrix4fv(view_handle, 1, gl::FALSE, view.inner.as_ptr() as *const GLfloat);
             gl::UniformMatrix4fv(model_handle, 1, gl::FALSE, 
                 self.transform.transform_matrix.inner.as_ptr() as *const GLfloat);
 
-            
-            gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, light.as_matrix().as_ptr() as *const GLfloat);
-            
-            //let light: [GLfloat; 3] = [1.0, 1.0, 1.0];
-            //gl::Uniform3fv(light_handle, 1, light.as_ptr() as *const GLfloat);
+            if self.shader_type == ShaderType::Gouraud {
+                let light_handle = gl::GetUniformLocation(program.0, CString::new("u_light").unwrap().as_ptr());
+                let light = light.direction;
+                gl::Uniform3fv(light_handle, 1, light.as_ptr() as *const GLfloat);
+
+            }
+            else if self.shader_type == ShaderType::BlinnPhong {
+                let light_handle = gl::GetUniformLocation(program.0, CString::new("u_light").unwrap().as_ptr());
+                gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, light.as_matrix().as_ptr() as *const GLfloat);
+
+                // Add material uniforms
+                let ambient_color_handle = gl::GetUniformLocation(program.0, CString::new("ambient_color").unwrap().as_ptr());
+                let diffuse_color_handle = gl::GetUniformLocation(program.0, CString::new("diffuse_color").unwrap().as_ptr());
+                let emission_color_handle = gl::GetUniformLocation(program.0, CString::new("emission_color").unwrap().as_ptr());
+                let specular_color_handle = gl::GetUniformLocation(program.0, CString::new("specular_color").unwrap().as_ptr());
+                let specular_exp_handle = gl::GetUniformLocation(program.0, CString::new("specular_exp").unwrap().as_ptr());
+
+                gl::Uniform3fv(ambient_color_handle, 1, self.material.ambient_color.as_ptr() as *const GLfloat);
+                gl::Uniform3fv(diffuse_color_handle, 1, self.material.diffuse_color.as_ptr() as *const GLfloat);
+                gl::Uniform3fv(emission_color_handle, 1, self.material.emission_color.as_ptr() as *const GLfloat);
+                gl::Uniform3fv(specular_color_handle, 1, self.material.specular_color.as_ptr() as *const GLfloat);
+
+                gl::Uniform1f(specular_exp_handle, self.material.specular_exp);
+            }
 
             gl::DrawElements(
                 gl::TRIANGLES,      

@@ -202,15 +202,17 @@ fn demo_3d() {
 
     let angle_func = |t: f32| { (t / 5.0) * 360.0 };
     let rotation_animation = 
-        Box::new(three_d::animation::Rotation {ty: three_d::animation::RotationType::Y, angle_func}) as Box<dyn three_d::animation::Animation>;  
-        
+        Box::new(three_d::animation::Rotation {ty: three_d::animation::RotationType::X, angle_func}) as Box<dyn three_d::animation::Animation>;  
+
     let mut s = Shape::from_obj(
-        "media\\monkey.obj", 
+        "media\\torus.obj", 
         ShaderType::BlinnPhong, 
         None, 
         Some(rotation_animation), 
         false, 
     ).unwrap();
+
+    println!("Torus Material: {:?}", s.material);
 
 
     unsafe { 
@@ -280,7 +282,7 @@ fn demo_3d() {
             let dims = (dims.width as f32, dims.height as f32);
 
             let light = Light {
-                direction: [1.0, 1.0, 1.0],
+                direction: [1.0, 1.0, -1.0],
 
                 ambient: [1.0, 1.0, 1.0],
                 diffuse: [1.0, 1.0, 1.0],

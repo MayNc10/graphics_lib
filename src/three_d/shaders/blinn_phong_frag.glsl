@@ -12,17 +12,11 @@ uniform mat4 u_light;
 // diffuse
 // specular
 
-//uniform vec3 ambient_color;
-//uniform vec3 diffuse_color;
-//uniform vec3 emission_color;
-//uniform vec3 specular_color;
-//uniform float specular_exp;
-
-vec3 ambient_color = vec3(0.3, 0.1, 0.0);
-vec3 diffuse_color = vec3(0.0, 0.3, 0.6);
-vec3 emission_color = vec3(0.0, 0.0, 0.0);
-vec3 specular_color = vec3(1.0, 1.0, 1.0);
-float specular_exp = 16.0;
+uniform vec3 ambient_color;
+uniform vec3 diffuse_color;
+uniform vec3 emission_color;
+uniform vec3 specular_color;
+uniform float specular_exp;
 
 vec3 calc_dir_light(mat4 light, vec3 normal, vec3 viewdir);
 
@@ -40,8 +34,8 @@ vec3 calc_dir_light(mat4 light, vec3 normal, vec3 view_dir) {
     // Specular lighting
     float spec = pow(max(dot(view_dir, normal), 0.0), specular_exp);
     // combine results
-    vec3 ambient  = light[1].xyz  * ambient_color;
-    vec3 diffuse  = light[2].xyz  * diff * diffuse_color;
+    vec3 ambient  = light[1].xyz * ambient_color;
+    vec3 diffuse  = light[2].xyz * diff * diffuse_color;
     vec3 specular = light[3].xyz * spec * specular_color;
     return (ambient + diffuse + specular + emission_color);
 } 
