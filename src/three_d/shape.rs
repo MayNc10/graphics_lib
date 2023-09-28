@@ -1,32 +1,22 @@
-use std::hash::Hash;
+use gl::types::*;
+use std::ffi::CString;
+use std::mem;
+use std::ptr;
+use std::str;
 
-use glium::{self, implement_vertex, Surface, Frame, uniform, uniforms::{UniformsStorage, EmptyUniforms}, Display, VertexBuffer, IndexBuffer};
 use image;
 
 use crate::matrix::*;
-use super::{shaders, animation::Animation};
+use super::{shaders, animation::Animation, buffer::*, VAO::*};
 
 pub mod importing;
 use importing::*;
 
-const FOV: f32 = std::f32::consts::PI / 3.0;
-const ZFAR: f32 = 1024.0;
-const ZNEAR: f32 = 0.1;
+pub const FOV: f32 = std::f32::consts::PI / 3.0;
+pub const ZFAR: f32 = 1024.0;
+pub const ZNEAR: f32 = 0.1;
 
 //const EPSILON: f32 = 1e-3;
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Vertex {
-    pub position: (f32, f32, f32)
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Normal {
-    pub normal: (f32, f32, f32)
-}
-
-implement_vertex!(Vertex, position);
-implement_vertex!(Normal, normal);
 
 #[derive(Clone, Copy)]
 pub struct Transform {
@@ -83,20 +73,23 @@ impl Default for Transform {
 }
 
 pub struct Shape {
-    positions : VertexBuffer<Vertex>,
-    normals: VertexBuffer<Normal>,
-    indices: IndexBuffer<u16>,
+    //vao: VertexArrayObject,
 
-    transform: Transform,
+    positions: VertexBuffer,
+    //normals: NormalBuffer,
+    pub indices: IndexBuffer,
+
+    pub transform: Transform,
     animation: Option<Box<dyn Animation>>,
 
     pub shader_type: shaders::ShaderType,
-    bface_culling: glium::draw_parameters::BackfaceCullingMode,
+    //bface_culling: glium::draw_parameters::BackfaceCullingMode,
 
     material: Material,
 
 }
 
+/* 
 impl Shape {
     pub fn new(positions: VertexBuffer<Vertex>, normals: VertexBuffer<Normal>, indices: IndexBuffer<u16>, 
             shader_type: shaders::ShaderType, transform: Option<Transform>, animation: Option<Box<dyn Animation>>, bface_culling: bool, 
@@ -111,6 +104,7 @@ impl Shape {
         Shape { positions , normals, indices, transform: transform.unwrap_or_default(), animation, shader_type, bface_culling, material}
     }
 }
+*/
 
 impl Shape {
     pub fn animate(&mut self, t: f32) {
@@ -162,20 +156,10 @@ impl Light {
 }
 
 impl Shape {
-    pub fn draw(&self, frame: &mut Frame, light: &Light, view: &Mat4, program: &glium::Program) {
-        let params = glium::DrawParameters {
-            depth: glium::Depth {
-                test: glium::draw_parameters::DepthTest::IfLess, // When should we use pixel values? IfLess (than the value already there)
-                write: true, // Write the new pixel depths to the depth buffer
-                .. Default::default()
-            },
-            backface_culling: self.bface_culling,
-            .. Default::default()
-        };
-
+    pub fn draw(&self, light: &Light, view: &Mat4, program: &shaders::Program, dims: (f32, f32)) {
         // perspective matrix        
         let perspective = {
-            let (width, height) = frame.get_dimensions();
+            let (width, height) = dims;
             let aspect_ratio = height as f32 / width as f32;
 
             let f = 1.0 / (FOV / 2.0).tan();
@@ -187,8 +171,64 @@ impl Shape {
                 [         0.0         ,    0.0, -(2.0*ZFAR*ZNEAR)/(ZFAR-ZNEAR),   0.0],
             ]
         };
+        unsafe {
+            // Clear the screen
+            gl::ClearColor(0.0, 0.6, 0.3, 1.0);
+            gl::Clear(gl::COLOR_BUFFER_BIT);
+            /* 
+            // Bind program
+            gl::UseProgram(program.0); 
+            gl::BindFragDataLocation(program.0, 0, CString::new("color").unwrap().as_ptr());
 
-        if self.shader_type != shaders::ShaderType::BlinnPhong {
+            // Specify the layout of the vertex data
+            let pos_attr = gl::GetAttribLocation(program.0, CString::new("position").unwrap().as_ptr());
+            gl::EnableVertexAttribArray(pos_attr as GLuint);
+            gl::VertexAttribPointer(
+                pos_attr as GLuint,
+                3,
+                gl::FLOAT,
+                gl::FALSE as GLboolean,
+                mem::size_of::<Vertex>() as GLint,
+                ptr::null()
+            ); */
+            
+
+            // FIXME: Assumes just using no shader
+            // Get uniform handles
+            //let perspective_handle = gl::GetUniformLocation(program.0, CString::new("perspective").unwrap().as_ptr());
+            //let view_handle = gl::GetUniformLocation(program.0, CString::new("view").unwrap().as_ptr());
+            //let model_handle = gl::GetUniformLocation(program.0, CString::new("model").unwrap().as_ptr());
+
+            // Bind matrix data to uniforms
+            //gl::UniformMatrix4fv(perspective_handle, 1, gl::FALSE, perspective.as_ptr() as *const GLfloat);
+            //gl::UniformMatrix4fv(view_handle, 1, gl::FALSE, view.inner.as_ptr() as *const GLfloat);
+            //gl::UniformMatrix4fv(model_handle, 1, gl::FALSE, 
+            //    self.transform.transform_matrix.inner.as_ptr() as *const GLfloat);
+            
+            // Make sure we have the right VAO loaded
+            //gl::BindVertexArray(*self.vao.id());
+
+            //gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, *self.indices.get_id());
+
+            gl::DrawElements(
+                gl::TRIANGLES,      
+                self.indices.num_indices as i32,    
+                gl::UNSIGNED_INT,   
+                ptr::null()     
+            );
+
+            // FIXME: This should happen as the drop function of some struct (from where we bind the VAO)
+            //gl::BindVertexArray(0);
+
+            //gl::DisableVertexAttribArray(pos_attr as GLuint);
+        }
+        
+
+        
+    }
+}
+
+/*if self.shader_type != shaders::ShaderType::BlinnPhong {
             let uniforms = uniform! {
                 model: self.transform.transform_matrix.inner, view: view.inner, perspective: perspective, u_light: light.direction};
 
@@ -205,8 +245,4 @@ impl Shape {
 
             frame.draw((&self.positions , &self.normals), &self.indices, program, &uniforms,
             &params).unwrap();
-        }
-
-        
-    }
-}
+        } */
