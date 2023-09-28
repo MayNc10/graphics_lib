@@ -18,7 +18,7 @@ uniform mat4 u_light;
 //uniform vec3 specular_color;
 //uniform float specular_exp;
 
-vec3 ambient_color = vec3(0.3, 0.1, 0.0);
+vec3 ambient_color = vec3(0.0, 0.0, 0.0);
 vec3 diffuse_color = vec3(0.0, 0.3, 0.6);
 vec3 emission_color = vec3(0.0, 0.0, 0.0);
 vec3 specular_color = vec3(1.0, 1.0, 1.0);
