@@ -75,8 +75,8 @@ impl Default for Transform {
 pub struct Shape {
     //vao: VertexArrayObject,
 
-    positions: VertexBuffer,
-    //normals: NormalBuffer,
+    pub positions: VertexBuffer,
+    pub normals: NormalBuffer,
     pub indices: IndexBuffer,
 
     pub transform: Transform,

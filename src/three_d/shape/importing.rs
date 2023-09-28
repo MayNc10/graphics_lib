@@ -329,7 +329,7 @@ impl Shape {
                         //let (vao, vao_lock) = VertexArrayObject::new().unwrap();
 
                         let positions = VertexBuffer::new(&vertices_out, &vao_lock);
-                        //let normals_buffer = NormalBuffer::new(&normals_out, &vao_lock);
+                        let normals_buffer = NormalBuffer::new(&normals_out, &vao_lock);
                         let indices_buffer = IndexBuffer::new(&indices, &vao_lock); 
 
                         // Make sure program attributes are set up correctly
@@ -345,7 +345,7 @@ impl Shape {
                         let s = Shape {
                             //vao,
                             positions, 
-                            //normals: normals_buffer, 
+                            normals: normals_buffer, 
                             indices: indices_buffer, 
                             transform: transform.unwrap_or_default(), 
                             animation: new_animation, shader_type, 
@@ -373,7 +373,7 @@ impl Shape {
         //let (vao, vao_lock) = VertexArrayObject::new().unwrap();
 
         let positions = VertexBuffer::new(&vertices_out, &vao_lock);
-        //let normals_buffer = NormalBuffer::new(&normals_out, &vao_lock);
+        let normals_buffer = NormalBuffer::new(&normals_out, &vao_lock);
         let indices_buffer = IndexBuffer::new(&indices, &vao_lock); 
 
         // Make sure program attributes are set up correctly
@@ -389,7 +389,7 @@ impl Shape {
         let s = Shape {
             //vao,
             positions, 
-            //normals: normals_buffer, 
+            normals: normals_buffer, 
             indices: indices_buffer, 
             transform: transform.unwrap_or_default(), 
             animation: new_animation, shader_type, 

@@ -25,6 +25,9 @@ impl VertexBuffer {
         }
         VertexBuffer { id }
     }
+    pub fn id(&self) -> &GLuint {
+        &self.id
+    }
 }
 
 impl Drop for VertexBuffer {
@@ -43,23 +46,26 @@ impl NormalBuffer {
     pub fn new(data: &[Normal], vao_lock: &VAOLock) -> NormalBuffer {
         let mut id = 0;
         unsafe {
-            gl::GenBuffers(1, &mut id);
-            gl::BindBuffer(gl::ARRAY_BUFFER, id);
-            gl::BufferData(
-                gl::ARRAY_BUFFER,
-                (data.len() * mem::size_of::<Normal>()) as GLsizeiptr,
-                &data[0] as *const Normal as *const _,
-                gl::STATIC_DRAW,
-            );
+            //gl::GenBuffers(1, &mut id);
+            //gl::BindBuffer(gl::ARRAY_BUFFER, id);
+            //gl::BufferData(
+            //    gl::ARRAY_BUFFER,
+            //    (data.len() * mem::size_of::<Normal>()) as GLsizeiptr,
+            //    &data[0] as *const Normal as *const _,
+            //    gl::STATIC_DRAW,
+            //);
         }
         NormalBuffer { id }
+    }
+    pub fn id(&self) -> &GLuint {
+        &self.id
     }
 }
 
 impl Drop for NormalBuffer {
     fn drop(&mut self) {
         unsafe {
-            gl::DeleteBuffers(1, &self.id);
+            //gl::DeleteBuffers(1, &self.id);
         }
     }
 }
