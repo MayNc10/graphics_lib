@@ -195,8 +195,8 @@ fn demo_3d() {
     }
 
     // Create GLSL shaders
-    let vs = compile_shader(shaders::BLINN_PHONG_3D_SHADER, shaders::ShaderProgramType::Vertex);
-    let fs = compile_shader(shaders::BLINN_PHONG_3D_FRAG_SHADER, shaders::ShaderProgramType::Fragment);
+    let vs = compile_shader(shaders::GOURAUD_3D_SHADER, shaders::ShaderProgramType::Vertex);
+    let fs = compile_shader(shaders::GOURAUD_3D_FRAG_SHADER, shaders::ShaderProgramType::Fragment);
     let program = link_program(vs, fs);
 
     
@@ -222,6 +222,7 @@ fn demo_3d() {
         gl::UseProgram(program.0); 
         gl::BindFragDataLocation(program.0, 0, CString::new("color").unwrap().as_ptr());
 
+        gl::BindBuffer(gl::ARRAY_BUFFER, *s.positions.id());
         // Specify the layout of the vertex data
         let pos_attr = gl::GetAttribLocation(program.0, CString::new("position").unwrap().as_ptr());
         gl::VertexAttribPointer(
@@ -235,6 +236,7 @@ fn demo_3d() {
         gl::EnableVertexAttribArray(pos_attr as GLuint);
 
         // Specify the layout of the vertex data
+        gl::BindBuffer(gl::ARRAY_BUFFER, *s.normals.id());
         let norm_attr = gl::GetAttribLocation(program.0, CString::new("normal").unwrap().as_ptr());
         gl::VertexAttribPointer(
             norm_attr as GLuint,
@@ -367,14 +369,16 @@ fn demo_3d() {
                 gl::UniformMatrix4fv(model_handle, 1, gl::FALSE, 
                     s.transform.transform_matrix.inner.as_ptr() as *const GLfloat);
 
-                let light: [[GLfloat; 4];4] = [
-                    [1.0, 1.0, 1.0, 0.0],
-                    [1.0, 1.0, 1.0, 0.0],
-                    [1.0, 1.0, 1.0, 0.0],
-                    [1.0, 1.0, 1.0, 0.0],
-                ];
-                gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, light.as_ptr() as *const GLfloat);
+                //let light: [[GLfloat; 4];4] = [
+                //    [1.0, 1.0, 1.0, 0.0],
+                //    [1.0, 1.0, 1.0, 0.0],
+                //    [1.0, 1.0, 1.0, 0.0],
+                //    [1.0, 1.0, 1.0, 0.0],
+                //];
+                //gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, light.as_ptr() as *const GLfloat);
                 
+                let light: [GLfloat; 3] = [1.0, 1.0, 1.0];
+                gl::Uniform3fv(light_handle, 1, light.as_ptr() as *const GLfloat);
 
                 gl::DrawElements(
                     gl::TRIANGLES,      // mode
