@@ -7,6 +7,7 @@ use std::str;
 use image;
 
 use crate::matrix::*;
+use super::shaders::Program;
 use super::{shaders, animation::Animation, buffer::*, VAO::*};
 
 pub mod importing;
@@ -73,7 +74,7 @@ impl Default for Transform {
 }
 
 pub struct Shape {
-    //vao: VertexArrayObject,
+    vao: VertexArrayObject,
 
     pub positions: VertexBuffer,
     pub normals: NormalBuffer,
@@ -105,6 +106,42 @@ impl Shape {
     }
 }
 */
+
+impl Shape {
+    pub fn bind_attributes(&self, program: &Program) {
+        unsafe {
+            gl::BindVertexArray(*self.vao.id());
+
+            gl::BindBuffer(gl::ARRAY_BUFFER, *self.positions.id());
+            // Specify the layout of the vertex data
+            let pos_attr = gl::GetAttribLocation(program.0, CString::new("position").unwrap().as_ptr());
+            gl::VertexAttribPointer(
+                pos_attr as GLuint,
+                3,
+                gl::FLOAT,
+                gl::FALSE as GLboolean,
+                0,//mem::size_of::<Vertex>() as GLint,
+                ptr::null()
+            );
+            gl::EnableVertexAttribArray(pos_attr as GLuint);
+
+            // Specify the layout of the vertex data
+            gl::BindBuffer(gl::ARRAY_BUFFER, *self.normals.id());
+            let norm_attr = gl::GetAttribLocation(program.0, CString::new("normal").unwrap().as_ptr());
+            gl::VertexAttribPointer(
+                norm_attr as GLuint,
+                3,
+                gl::FLOAT,
+                gl::TRUE as GLboolean,
+                0,//mem::size_of::<Normal>() as GLint,
+                ptr::null()
+            );
+            gl::EnableVertexAttribArray(norm_attr as GLuint);
+
+            gl::BindVertexArray(0);
+        }
+    }
+}
 
 impl Shape {
     pub fn animate(&mut self, t: f32) {
@@ -172,55 +209,32 @@ impl Shape {
             ]
         };
         unsafe {
-            // Clear the screen
-            gl::ClearColor(0.0, 0.6, 0.3, 1.0);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
-            /* 
-            // Bind program
-            gl::UseProgram(program.0); 
-            gl::BindFragDataLocation(program.0, 0, CString::new("color").unwrap().as_ptr());
-
-            // Specify the layout of the vertex data
-            let pos_attr = gl::GetAttribLocation(program.0, CString::new("position").unwrap().as_ptr());
-            gl::EnableVertexAttribArray(pos_attr as GLuint);
-            gl::VertexAttribPointer(
-                pos_attr as GLuint,
-                3,
-                gl::FLOAT,
-                gl::FALSE as GLboolean,
-                mem::size_of::<Vertex>() as GLint,
-                ptr::null()
-            ); */
+            gl::BindVertexArray(*self.vao.id());
             
-
-            // FIXME: Assumes just using no shader
-            // Get uniform handles
-            //let perspective_handle = gl::GetUniformLocation(program.0, CString::new("perspective").unwrap().as_ptr());
-            //let view_handle = gl::GetUniformLocation(program.0, CString::new("view").unwrap().as_ptr());
-            //let model_handle = gl::GetUniformLocation(program.0, CString::new("model").unwrap().as_ptr());
-
+            let perspective_handle = gl::GetUniformLocation(program.0, CString::new("perspective").unwrap().as_ptr());
+            let view_handle = gl::GetUniformLocation(program.0, CString::new("view").unwrap().as_ptr());
+            let model_handle = gl::GetUniformLocation(program.0, CString::new("model").unwrap().as_ptr());
+            let light_handle = gl::GetUniformLocation(program.0, CString::new("u_light").unwrap().as_ptr());
             // Bind matrix data to uniforms
-            //gl::UniformMatrix4fv(perspective_handle, 1, gl::FALSE, perspective.as_ptr() as *const GLfloat);
-            //gl::UniformMatrix4fv(view_handle, 1, gl::FALSE, view.inner.as_ptr() as *const GLfloat);
-            //gl::UniformMatrix4fv(model_handle, 1, gl::FALSE, 
-            //    self.transform.transform_matrix.inner.as_ptr() as *const GLfloat);
-            
-            // Make sure we have the right VAO loaded
-            //gl::BindVertexArray(*self.vao.id());
+            gl::UniformMatrix4fv(perspective_handle, 1, gl::FALSE, perspective.as_ptr() as *const GLfloat);
+            gl::UniformMatrix4fv(view_handle, 1, gl::FALSE, view.inner.as_ptr() as *const GLfloat);
+            gl::UniformMatrix4fv(model_handle, 1, gl::FALSE, 
+                self.transform.transform_matrix.inner.as_ptr() as *const GLfloat);
 
-            //gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, *self.indices.get_id());
+            
+            gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, light.as_matrix().as_ptr() as *const GLfloat);
+            
+            //let light: [GLfloat; 3] = [1.0, 1.0, 1.0];
+            //gl::Uniform3fv(light_handle, 1, light.as_ptr() as *const GLfloat);
 
             gl::DrawElements(
                 gl::TRIANGLES,      
-                self.indices.num_indices as i32,    
+                self.indices.num_indices as GLint,    
                 gl::UNSIGNED_INT,   
-                ptr::null()     
+                ptr::null()           
             );
 
-            // FIXME: This should happen as the drop function of some struct (from where we bind the VAO)
-            //gl::BindVertexArray(0);
-
-            //gl::DisableVertexAttribArray(pos_attr as GLuint);
+            gl::BindVertexArray(0);
         }
         
 

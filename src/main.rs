@@ -3,6 +3,7 @@ use gl::types::*;
 use graphics_lib::three_d::VAO::VAOLock;
 use graphics_lib::three_d::VAO::VertexArrayObject;
 use graphics_lib::three_d::shape;
+use graphics_lib::three_d::shape::Light;
 use graphics_lib::three_d::shape::Shape;
 use graphics_lib::three_d::shape::Transform;
 use graphics_lib::three_d::shape::importing;
@@ -195,110 +196,33 @@ fn demo_3d() {
     }
 
     // Create GLSL shaders
-    let vs = compile_shader(shaders::GOURAUD_3D_SHADER, shaders::ShaderProgramType::Vertex);
-    let fs = compile_shader(shaders::GOURAUD_3D_FRAG_SHADER, shaders::ShaderProgramType::Fragment);
+    let vs = compile_shader(shaders::BLINN_PHONG_3D_SHADER, shaders::ShaderProgramType::Vertex);
+    let fs = compile_shader(shaders::BLINN_PHONG_3D_FRAG_SHADER, shaders::ShaderProgramType::Fragment);
     let program = link_program(vs, fs);
-
-    
-    let (_vao, vao_lock) = VertexArrayObject::new().unwrap();
 
     let angle_func = |t: f32| { (t / 5.0) * 360.0 };
     let rotation_animation = 
         Box::new(three_d::animation::Rotation {ty: three_d::animation::RotationType::Y, angle_func}) as Box<dyn three_d::animation::Animation>;  
-
-
-    //let (_v_buffer, _index_buffer) = buffers(&vao_lock, &VERTEX_DATA, &INDICES);
+        
     let mut s = Shape::from_obj(
-        "media\\square.obj", 
+        "media\\monkey.obj", 
         ShaderType::BlinnPhong, 
         None, 
         Some(rotation_animation), 
         false, 
-        &vao_lock
-    ).unwrap().pop().unwrap();
+    ).unwrap();
+
 
     unsafe { 
         // Use shader program
         gl::UseProgram(program.0); 
         gl::BindFragDataLocation(program.0, 0, CString::new("color").unwrap().as_ptr());
 
-        gl::BindBuffer(gl::ARRAY_BUFFER, *s.positions.id());
-        // Specify the layout of the vertex data
-        let pos_attr = gl::GetAttribLocation(program.0, CString::new("position").unwrap().as_ptr());
-        gl::VertexAttribPointer(
-            pos_attr as GLuint,
-            3,
-            gl::FLOAT,
-            gl::FALSE as GLboolean,
-            0,//mem::size_of::<Vertex>() as GLint,
-            ptr::null()
-        );
-        gl::EnableVertexAttribArray(pos_attr as GLuint);
-
-        // Specify the layout of the vertex data
-        gl::BindBuffer(gl::ARRAY_BUFFER, *s.normals.id());
-        let norm_attr = gl::GetAttribLocation(program.0, CString::new("normal").unwrap().as_ptr());
-        gl::VertexAttribPointer(
-            norm_attr as GLuint,
-            3,
-            gl::FLOAT,
-            gl::TRUE as GLboolean,
-            0,//mem::size_of::<Normal>() as GLint,
-            ptr::null()
-        );
-        gl::EnableVertexAttribArray(norm_attr as GLuint);
-
-        //gl::DisableVertexAttribArray(0);
-        //gl::DisableVertexAttribArray(1);
-        //gl::DisableVertexAttribArray(2);
+        s.bind_attributes(&program);
     }
-    
-    println!("Set up program!");
 
     s.set_scaling(generate_scale(&[0.5; 3]));
     s.set_translation(generate_translate(None, None, Some(2.0)));
-
-    let program_setup = |program: &Program, lock: &VAOLock| {
-        unsafe {
-            // Use shader program
-            gl::UseProgram(program.0); 
-            gl::BindFragDataLocation(program.0, 0, CString::new("color").unwrap().as_ptr());
-
-            // Specify the layout of the vertex data
-            let pos_attr = gl::GetAttribLocation(program.0, CString::new("position").unwrap().as_ptr());
-            gl::VertexAttribPointer(
-                pos_attr as GLuint,
-                3,
-                gl::FLOAT,
-                gl::FALSE as GLboolean,
-                mem::size_of::<Vertex>() as GLint,
-                ptr::null()
-            );
-            gl::EnableVertexAttribArray(pos_attr as GLuint);
-        }
-    };
-
-    let program_setup = |program: &Program, lock: &VAOLock| {};
-
-    let dims = gl_window.window().inner_size();
-
-    let perspective = {
-        let (width, height) = (dims.width, dims.height);
-        let aspect_ratio = height as f32 / width as f32;
-
-        let f = 1.0 / (shape::FOV / 2.0).tan();
-
-        [
-            [f *   aspect_ratio   ,    0.0,              0.0              ,   0.0],
-            [         0.0         ,     f ,              0.0              ,   0.0],
-            [         0.0         ,    0.0,  (shape::ZFAR+shape::ZNEAR)/(shape::ZFAR-shape::ZNEAR)    ,   1.0],
-            [         0.0         ,    0.0, -(2.0*shape::ZFAR*shape::ZNEAR)/(shape::ZFAR-shape::ZNEAR),   0.0],
-        ]
-    };
-
-    // Create vertex and index buffers
-    //let vertex_buffer = VertexBuffer::new(&VERTEX_DATA);
-    //let index_buffer = IndexBuffer::new(&INDICES);
 
     let mut t: f32 = 0.0;
     let delta: f32 = 0.02;
@@ -352,45 +276,25 @@ fn demo_3d() {
 
             s.animate(t);
 
+            let dims = gl_window.window().inner_size();
+            let dims = (dims.width as f32, dims.height as f32);
+
+            let light = Light {
+                direction: [1.0, 1.0, 1.0],
+
+                ambient: [1.0, 1.0, 1.0],
+                diffuse: [1.0, 1.0, 1.0],
+                specular: [1.0, 1.0, 1.0],
+            };
+
             unsafe {
                 // Clear the screen to black
                 gl::ClearColor(0.3, 0.3, 0.3, 1.0);
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-                // Draw a triangle from the 3 vertices
-                //gl::DrawArrays(gl::TRIANGLES, 0, 3)
-                
-                let perspective_handle = gl::GetUniformLocation(program.0, CString::new("perspective").unwrap().as_ptr());
-                let view_handle = gl::GetUniformLocation(program.0, CString::new("view").unwrap().as_ptr());
-                let model_handle = gl::GetUniformLocation(program.0, CString::new("model").unwrap().as_ptr());
-                let light_handle = gl::GetUniformLocation(program.0, CString::new("u_light").unwrap().as_ptr());
-                // Bind matrix data to uniforms
-                gl::UniformMatrix4fv(perspective_handle, 1, gl::FALSE, perspective.as_ptr() as *const GLfloat);
-                gl::UniformMatrix4fv(view_handle, 1, gl::FALSE, view.inner.as_ptr() as *const GLfloat);
-                gl::UniformMatrix4fv(model_handle, 1, gl::FALSE, 
-                    s.transform.transform_matrix.inner.as_ptr() as *const GLfloat);
-
-                //let light: [[GLfloat; 4];4] = [
-                //    [1.0, 1.0, 1.0, 0.0],
-                //    [1.0, 1.0, 1.0, 0.0],
-                //    [1.0, 1.0, 1.0, 0.0],
-                //    [1.0, 1.0, 1.0, 0.0],
-                //];
-                //gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, light.as_ptr() as *const GLfloat);
-                
-                let light: [GLfloat; 3] = [1.0, 1.0, 1.0];
-                gl::Uniform3fv(light_handle, 1, light.as_ptr() as *const GLfloat);
-
-                gl::DrawElements(
-                    gl::TRIANGLES,      // mode
-                    s.indices.num_indices as GLint,    // count
-                    gl::UNSIGNED_INT,   // type
-                    ptr::null()            // element array buffer offset
-                );
-
-                //let dims = gl_window.window().inner_size();
-                //cube.draw(&light, &view, &program, (dims.height as f32, dims.width as f32))
-                
             }
+
+            s.draw(&light, &view, &program, dims);      
+            
             gl_window.swap_buffers().unwrap();
 
             start_time = std::time::Instant::now();

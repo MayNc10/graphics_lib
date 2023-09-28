@@ -1,8 +1,8 @@
-use std::{fs::{self, File}, collections::HashMap, path::Path, mem::size_of};
+use std::{fs, collections::HashMap, path::Path};
 
-use crate::three_d::shaders::{self, Program};
+use crate::three_d::shaders;
 
-use super::{*, super::buffer::*};
+use super::*;
 
 pub const MAT: Material = Material {
     ambient_color: [0.2, 0.0, 0.0],
@@ -195,8 +195,7 @@ impl Shape {
         // FIXME: We shouldn't have to specify a shader type and the program itself!
         transform: Option<Transform>, 
         animation: Option<Box<dyn Animation>>, 
-        bface_culling: bool,
-        vao_lock: &VAOLock) -> Result<Vec<Shape>, ImportError> 
+        _bface_culling: bool,) -> Result<Shape, ImportError> 
     {
         if &path[path.len() - 4..] != ".obj" { return Err(ImportError::IncorrectExtension); }
         let bytes = fs::read(path);
@@ -205,8 +204,6 @@ impl Shape {
         }
         let f = String::from_utf8_lossy(bytes.as_ref().unwrap());
         let lines = f.split("\n");
-        
-        let mut shapes = Vec::new();
 
         // Get materials library
         let mut new_path = String::from(&path[..path.len() - 3]);
@@ -224,7 +221,6 @@ impl Shape {
 
         let mut indices: Vec<u32> = Vec::new();
 
-        let mut object_name = None;
         let mut material_name = None;
 
         for line in lines {
@@ -325,8 +321,8 @@ impl Shape {
                 },
                 "o" => {
                     // Have we actually parsed a shape yet?
-                    if object_name.is_some() {
-                        //let (vao, vao_lock) = VertexArrayObject::new().unwrap();
+                    if false {
+                        let (vao, vao_lock) = VertexArrayObject::new().unwrap();
 
                         let positions = VertexBuffer::new(&vertices_out, &vao_lock);
                         let normals_buffer = NormalBuffer::new(&normals_out, &vao_lock);
@@ -343,7 +339,7 @@ impl Shape {
                         let material = *mat_map.get(&material_name.unwrap_or_default()).unwrap_or(&Material::default());
 
                         let s = Shape {
-                            //vao,
+                            vao,
                             positions, 
                             normals: normals_buffer, 
                             indices: indices_buffer, 
@@ -351,14 +347,14 @@ impl Shape {
                             animation: new_animation, shader_type, 
                             material
                         };
-                        shapes.push(s);
 
                         // We don't clear the vertices or normals lists
                         vertices_out.clear();
                         normals_out.clear();
                         indices.clear();
                     }
-                    object_name = Some(String::from(tokens.next().unwrap()));
+                    
+                    eprintln!("WARNING: Loading two objects from the same .obj file can cause problems");
                     material_name = None;
                 },
                 "usemtl" => {
@@ -370,7 +366,7 @@ impl Shape {
             }
         }
 
-        //let (vao, vao_lock) = VertexArrayObject::new().unwrap();
+        let (vao, vao_lock) = VertexArrayObject::new().unwrap();
 
         let positions = VertexBuffer::new(&vertices_out, &vao_lock);
         let normals_buffer = NormalBuffer::new(&normals_out, &vao_lock);
@@ -387,7 +383,7 @@ impl Shape {
         let material = *mat_map.get(&material_name.unwrap_or_default()).unwrap_or(&Material::default());
 
         let s = Shape {
-            //vao,
+            vao,
             positions, 
             normals: normals_buffer, 
             indices: indices_buffer, 
@@ -395,9 +391,8 @@ impl Shape {
             animation: new_animation, shader_type, 
             material
         };
-        shapes.push(s);
 
-        Ok(shapes)
+        Ok(s)
     }
         
 }

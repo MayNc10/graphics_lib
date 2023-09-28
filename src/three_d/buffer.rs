@@ -1,10 +1,11 @@
 use gl::types::*;
-use std::mem;
+use std::{mem, ops::Deref};
 use super::VAO::VAOLock;
 
 pub type Vertex = [GLfloat; 3];
 
 pub type Normal = [GLfloat; 3];
+
 
 pub struct VertexBuffer {
     id: GLuint,
@@ -33,7 +34,7 @@ impl VertexBuffer {
 impl Drop for VertexBuffer {
     fn drop(&mut self) {
         unsafe {
-            //gl::DeleteBuffers(1, &self.id);
+            gl::DeleteBuffers(1, &self.id);
         }
     }
 }
@@ -65,7 +66,7 @@ impl NormalBuffer {
 impl Drop for NormalBuffer {
     fn drop(&mut self) {
         unsafe {
-            //gl::DeleteBuffers(1, &self.id);
+            gl::DeleteBuffers(1, &self.id);
         }
     }
 }
@@ -98,7 +99,7 @@ impl IndexBuffer {
 impl Drop for IndexBuffer {
     fn drop(&mut self) {
         unsafe {
-            //gl::DeleteBuffers(1, &self.id);
+            gl::DeleteBuffers(1, &self.id);
         }
     }
 }
