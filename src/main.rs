@@ -235,6 +235,8 @@ fn demo_3d() {
     let view = view_matrix(&[0.0, 0.0, 0.0], &[0.0, 0.0, 1.0], &[0.0, 1.0, 0.0]);
 
     event_loop.run(move |event, _, control_flow| {
+        
+
         use glutin::event::{Event, WindowEvent};
         use glutin::event_loop::ControlFlow;
         *control_flow = ControlFlow::Wait;
@@ -252,54 +254,67 @@ fn demo_3d() {
                 },
                 _ => (),
             },
-            Event::RedrawRequested(_) => {
-                
+            Event::RedrawRequested(_) => {  
+                let elapsed_time = std::time::Instant::now().duration_since(start_time).as_millis() as u64;
+
+                // How long should we wait for to run at 60 fps?
+                let wait_millis = match 1000 / TARGET_FPS >= elapsed_time {
+                    true => 1000 / TARGET_FPS - elapsed_time,
+                    false => 0
+                };
+
+                if wait_millis == 0 {
+                    // Update time
+                    t += delta;
+
+                    s.animate(t);
+
+                    let dims = gl_window.window().inner_size();
+                    let dims = (dims.width as f32, dims.height as f32);
+
+                    let light = Light {
+                        direction: [1.0, 1.0, -1.0],
+
+                        ambient: [1.0, 1.0, 1.0],
+                        diffuse: [1.0, 1.0, 1.0],
+                        specular: [1.0, 1.0, 1.0],
+                    };
+
+                    unsafe {
+                        // Clear the screen to black
+                        gl::ClearColor(0.3, 0.3, 0.3, 1.0);
+                        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+                    }
+
+                    s.draw(&light, &view, &program, dims);      
+                    
+                    gl_window.swap_buffers().unwrap();
+
+                    start_time = std::time::Instant::now(); 
+                } 
+
             },
             _ => (),
         }
 
-        // How long has this pass taken?
-        let elapsed_time = std::time::Instant::now().duration_since(start_time).as_millis() as u64;
+        match *control_flow {
+            ControlFlow::Exit => (),
+            _ => {
+                gl_window.window().request_redraw();
 
-        // How long should we wait for to run at 60 fps?
-        let wait_millis = match 1000 / TARGET_FPS >= elapsed_time {
-            true => 1000 / TARGET_FPS - elapsed_time,
-            false => 0
-        };
-        if wait_millis != 0 {
-            let new_inst = start_time + std::time::Duration::from_millis(wait_millis);
-            // Wait that long
-            *control_flow =  glutin::event_loop::ControlFlow::WaitUntil(new_inst);
-            //println!("Hitting fps goal!");
-        }
-        else {
-            // Update time
-            t += delta;
+                let elapsed_time = std::time::Instant::now().duration_since(start_time).as_millis() as u64;
 
-            s.animate(t);
+                // How long should we wait for to run at 60 fps?
+                let wait_millis = match 1000 / TARGET_FPS >= elapsed_time {
+                    true => 1000 / TARGET_FPS - elapsed_time,
+                    false => 0
+                };
 
-            let dims = gl_window.window().inner_size();
-            let dims = (dims.width as f32, dims.height as f32);
-
-            let light = Light {
-                direction: [1.0, 1.0, -1.0],
-
-                ambient: [1.0, 1.0, 1.0],
-                diffuse: [1.0, 1.0, 1.0],
-                specular: [1.0, 1.0, 1.0],
-            };
-
-            unsafe {
-                // Clear the screen to black
-                gl::ClearColor(0.3, 0.3, 0.3, 1.0);
-                gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+                let new_inst = start_time + std::time::Duration::from_millis(wait_millis);
+                // Wait that long
+                *control_flow =  glutin::event_loop::ControlFlow::WaitUntil(new_inst);
+                //println!("Hitting fps goal!");
             }
-
-            s.draw(&light, &view, &program, dims);      
-            
-            gl_window.swap_buffers().unwrap();
-
-            start_time = std::time::Instant::now();
         }
     });
 }
