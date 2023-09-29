@@ -1,7 +1,6 @@
 use gl::types::*;
 use lazy_static::lazy_static;
 use std::ffi::CString;
-use std::mem;
 use std::ptr;
 use std::str;
 

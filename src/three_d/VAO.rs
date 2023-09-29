@@ -21,13 +21,13 @@ pub unsafe fn unbind_buffers() {
 /// This represents this idea 
 /// It's also nice because it'll automaticall drop at the end of scope, and then it'll unbind everything
 pub struct VAOLock<'a> {
-    guard: MutexGuard<'a, ()>,
+    _guard: MutexGuard<'a, ()>,
 }
 
 impl VAOLock<'_> {
     /// Only make one of these when creating a VertexArrayObject
     pub(crate) unsafe fn new<'a>(guard: MutexGuard<'a, ()>) -> VAOLock<'a> {
-        VAOLock { guard }
+        VAOLock { _guard: guard }
     }
 }
 
@@ -65,7 +65,7 @@ impl VertexArrayObject {
 impl Drop for VertexArrayObject {
     fn drop(&mut self) {
         unsafe {
-            //gl::DeleteVertexArrays(1, &self.id)
+            gl::DeleteVertexArrays(1, &self.id)
         }
     }
 }

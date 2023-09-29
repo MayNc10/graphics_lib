@@ -3,11 +3,8 @@ use glutin::PossiblyCurrent;
 use glutin::window;
 
 use super::shaders::Program;
-use super::shaders::compile_shader;
-use super::shaders::link_program;
 use super::shape::Light;
 use super::shape::Shape;
-use super::shaders;
 use crate::matrix::Mat4;
 
 type ObjectCollection = (Vec<Shape>, &'static Program);

@@ -319,41 +319,7 @@ impl Shape {
                     }                    
                 },
                 "o" => {
-                    // Have we actually parsed a shape yet?
-                    if false {
-                        let (vao, vao_lock) = VertexArrayObject::new().unwrap();
-
-                        let positions = VertexBuffer::new(&vertices_out, &vao_lock);
-                        let normals_buffer = NormalBuffer::new(&normals_out, &vao_lock);
-                        let indices_buffer = IndexBuffer::new(&indices, &vao_lock); 
-
-                        // Make sure program attributes are set up correctly
-                        //program_setup(&program, &vao_lock);
-
-                        let new_animation = if let Some(b) = &animation {
-                            Some(b.clone_box())
-                        } else { None };
-
-                        // Is there a material for this object?
-                        let material = *mat_map.get(&material_name.unwrap_or_default()).unwrap_or(&Material::default());
-
-                        let s = Shape {
-                            vao,
-                            positions, 
-                            normals: normals_buffer, 
-                            indices: indices_buffer, 
-                            transform: transform.unwrap_or_default(), 
-                            animation: new_animation, shader_type, 
-                            material
-                        };
-
-                        // We don't clear the vertices or normals lists
-                        vertices_out.clear();
-                        normals_out.clear();
-                        indices.clear();
-                    }
-                    
-                    eprintln!("WARNING: Loading two objects from the same .obj file can cause problems");
+                    eprintln!("WARNING: Loading two objects from the same .obj file can cause problems, and is unsupported");
                     material_name = None;
                 },
                 "usemtl" => {
@@ -468,10 +434,7 @@ impl Material {
                     let g: f32 = tokens.next().unwrap().parse().unwrap();
                     let b: f32 = tokens.next().unwrap().parse().unwrap();
 
-                    // TODO: Blender exports with white ambient light, but that's wrong
-                    // Fix it
-                    println!("Overriding ambient color as black!");
-                    current_mat.as_mut().unwrap().ambient_color = [0.0; 3];
+                    current_mat.as_mut().unwrap().ambient_color = [r, g, b];
                 },
                 "Kd" => {
                     let r = tokens.next().unwrap().parse().unwrap();

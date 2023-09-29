@@ -94,7 +94,8 @@ impl Shape {
 
             gl::BindBuffer(gl::ARRAY_BUFFER, *self.positions.id());
             // Specify the layout of the vertex data
-            let pos_attr = gl::GetAttribLocation(program.0, CString::new("position").unwrap().as_ptr());
+            let pos_name = CString::new("position").unwrap();
+            let pos_attr = gl::GetAttribLocation(program.0, pos_name.as_ptr());
             gl::VertexAttribPointer(
                 pos_attr as GLuint,
                 3,
@@ -105,9 +106,10 @@ impl Shape {
             );
             gl::EnableVertexAttribArray(pos_attr as GLuint);
 
-            // Specify the layout of the vertex data
             gl::BindBuffer(gl::ARRAY_BUFFER, *self.normals.id());
-            let norm_attr = gl::GetAttribLocation(program.0, CString::new("normal").unwrap().as_ptr());
+            // Specify the layout of the vertex data
+            let norm_name = CString::new("normal").unwrap();
+            let norm_attr = gl::GetAttribLocation(program.0, norm_name.as_ptr());
             gl::VertexAttribPointer(
                 norm_attr as GLuint,
                 3,
@@ -190,32 +192,43 @@ impl Shape {
         };
         unsafe {
             gl::BindVertexArray(*self.vao.id());
+            let perspective_name = CString::new("perspective").unwrap();
+            let view_name = CString::new("view").unwrap();
+            let model_name = CString::new("model").unwrap();
             
-            let perspective_handle = gl::GetUniformLocation(program.0, CString::new("perspective").unwrap().as_ptr());
-            let view_handle = gl::GetUniformLocation(program.0, CString::new("view").unwrap().as_ptr());
-            let model_handle = gl::GetUniformLocation(program.0, CString::new("model").unwrap().as_ptr());
+            let perspective_handle = gl::GetUniformLocation(program.0, perspective_name.as_ptr());
+            let view_handle = gl::GetUniformLocation(program.0, view_name.as_ptr());
+            let model_handle = gl::GetUniformLocation(program.0, model_name.as_ptr());
             // Bind matrix data to uniforms
             gl::UniformMatrix4fv(perspective_handle, 1, gl::FALSE, perspective.as_ptr() as *const GLfloat);
             gl::UniformMatrix4fv(view_handle, 1, gl::FALSE, view.inner.as_ptr() as *const GLfloat);
             gl::UniformMatrix4fv(model_handle, 1, gl::FALSE, 
                 self.transform.transform_matrix.inner.as_ptr() as *const GLfloat);
 
+            let light_name = CString::new("u_light").unwrap();
+
             if self.shader_type == ShaderType::Gouraud {
-                let light_handle = gl::GetUniformLocation(program.0, CString::new("u_light").unwrap().as_ptr());
+                let light_handle = gl::GetUniformLocation(program.0, light_name.as_ptr());
                 let light = light.direction;
                 gl::Uniform3fv(light_handle, 1, light.as_ptr() as *const GLfloat);
 
             }
             else if self.shader_type == ShaderType::BlinnPhong {
-                let light_handle = gl::GetUniformLocation(program.0, CString::new("u_light").unwrap().as_ptr());
+                let light_handle = gl::GetUniformLocation(program.0, light_name.as_ptr());
                 gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, light.as_matrix().as_ptr() as *const GLfloat);
+                
+                let ambient_color_name = CString::new("ambient_color").unwrap();
+                let diffuse_color_name = CString::new("diffuse_color").unwrap();
+                let emission_color_name = CString::new("emission_color").unwrap();
+                let specular_color_name = CString::new("specular_color").unwrap();
+                let specular_exp_name = CString::new("specular_exp").unwrap();
 
                 // Add material uniforms
-                let ambient_color_handle = gl::GetUniformLocation(program.0, CString::new("ambient_color").unwrap().as_ptr());
-                let diffuse_color_handle = gl::GetUniformLocation(program.0, CString::new("diffuse_color").unwrap().as_ptr());
-                let emission_color_handle = gl::GetUniformLocation(program.0, CString::new("emission_color").unwrap().as_ptr());
-                let specular_color_handle = gl::GetUniformLocation(program.0, CString::new("specular_color").unwrap().as_ptr());
-                let specular_exp_handle = gl::GetUniformLocation(program.0, CString::new("specular_exp").unwrap().as_ptr());
+                let ambient_color_handle = gl::GetUniformLocation(program.0, ambient_color_name.as_ptr());
+                let diffuse_color_handle = gl::GetUniformLocation(program.0, diffuse_color_name.as_ptr());
+                let emission_color_handle = gl::GetUniformLocation(program.0, emission_color_name.as_ptr());
+                let specular_color_handle = gl::GetUniformLocation(program.0, specular_color_name.as_ptr());
+                let specular_exp_handle = gl::GetUniformLocation(program.0, specular_exp_name.as_ptr());
 
                 gl::Uniform3fv(ambient_color_handle, 1, self.material.ambient_color.as_ptr() as *const GLfloat);
                 gl::Uniform3fv(diffuse_color_handle, 1, self.material.diffuse_color.as_ptr() as *const GLfloat);
@@ -237,22 +250,3 @@ impl Shape {
         
     }
 }
-
-/*if self.shader_type != shaders::ShaderType::BlinnPhong {
-            let uniforms = uniform! {
-                model: self.transform.transform_matrix.inner, view: view.inner, perspective: perspective, u_light: light.direction};
-
-            frame.draw((&self.positions , &self.normals), &self.indices, program, &uniforms,
-            &params).unwrap();
-        } else {
-            let uniforms = uniform! {
-                model: self.transform.transform_matrix.inner, view: view.inner, perspective: perspective, u_light: light.as_matrix(), 
-                    ambient_color: self.material.ambient_color, 
-                    diffuse_color: self.material.diffuse_color, 
-                    emission_color: self.material.emission_color,
-                    specular_color: self.material.specular_color, 
-                    specular_exp: self.material.specular_exp};
-
-            frame.draw((&self.positions , &self.normals), &self.indices, program, &uniforms,
-            &params).unwrap();
-        } */

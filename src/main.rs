@@ -1,35 +1,21 @@
-use glutin::{*, event_loop::EventLoop};
-use gl::types::*;
+use glutin::event_loop::EventLoop;
 use graphics_lib::three_d::scene::Scene;
-use graphics_lib::three_d::vao::VAOLock;
-use graphics_lib::three_d::vao::VertexArrayObject;
-use graphics_lib::three_d::shape;
 use graphics_lib::three_d::shape::Light;
 use graphics_lib::three_d::shape::Shape;
-use graphics_lib::three_d::shape::Transform;
-use graphics_lib::three_d::shape::importing;
 use std::ffi::CString;
-use std::ffi::c_void;
-use std::mem;
-use std::ptr;
-use std::str;
 
 use graphics_lib::three_d::shaders::{*, self};
 //use graphics_lib::{three_d::shape::Light};
 use graphics_lib::three_d;
-//use graphics_lib::three_d::animation;
 use graphics_lib::matrix::*;
-//use graphics_lib::three_d::teapot;
-use image;
-use graphics_lib::three_d::buffer::*;
 
 // Set a target for fps (don't run faster or slower than this)
 const TARGET_FPS: u64 = 60;
 
 fn main() {
-    /* 
     let event_loop = glutin::event_loop::EventLoop::new();
-    let window = glutin::window::WindowBuilder::new();
+    let window: glutin::window::WindowBuilder = glutin::window::WindowBuilder::new()
+        .with_title("Graphics Lib");
     let gl_window = glutin::ContextBuilder::new()
         .build_windowed(window, &event_loop)
         .unwrap();
@@ -39,11 +25,8 @@ fn main() {
 
     // Load the OpenGL function pointers
     gl::load_with(|symbol| gl_window.get_proc_address(symbol));
-    
-    //demo_2d(event_loop, display);
+
     demo_3d(event_loop, gl_window);
-    */
-    demo_3d();
 }
 
 /* 
@@ -144,53 +127,7 @@ fn demo_2d(event_loop: EventLoop<()>, display: Display) {
 }
 */
 
-//static VERTEX_DATA: [GLfloat; 6] = [0.0, 0.5, 0.5, -0.5, -0.5, -0.5];
-static VERTEX_DATA: [Vertex; 4] = [
-    [0.0, 0.0, 0.0], 
-    [0.5, 0.0, 0.0], 
-    [0.0, 0.5, 0.0],
-    [0.5, 0.5, 0.0]];
-static INDICES: [GLuint; 6] = [0, 1, 2, 1, 2, 3];
-
-// Shader sources
-static VS_SRC: &'static str = "
-#version 150
-in vec3 position;
-
-void main() {
-    gl_Position = vec4(position, 1.0);
-}";
-
-static FS_SRC: &'static str = "
-#version 150
-out vec4 out_color;
-
-void main() {
-    out_color = vec4(1.0, 1.0, 1.0, 1.0);
-}";
-
-//event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::PossiblyCurrent, glutin::window::Window>
-
-fn buffers(lock: &VAOLock, vertices: &[Vertex], indices: &[GLuint]) -> (VertexBuffer, IndexBuffer) {
-    let v_buffer = VertexBuffer::new(vertices, &lock);
-    let index_buffer = IndexBuffer::new(indices, &lock);
-
-    (v_buffer, index_buffer)
-}
-
-fn demo_3d() {
-    let event_loop = glutin::event_loop::EventLoop::new();
-    let window = glutin::window::WindowBuilder::new();
-    let gl_window = glutin::ContextBuilder::new()
-        .build_windowed(window, &event_loop)
-        .unwrap();
-
-    // It is essential to make the context current before calling `gl::load_with`.
-    let gl_window = unsafe { gl_window.make_current() }.unwrap();
-
-    // Load the OpenGL function pointers
-    gl::load_with(|symbol| gl_window.get_proc_address(symbol));
-
+fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::PossiblyCurrent, glutin::window::Window>) {
     unsafe {
         gl::Enable(gl::DEPTH_TEST);
         gl::DepthFunc(gl::LESS);
@@ -201,7 +138,7 @@ fn demo_3d() {
     let light = Light {
         direction: [1.0, 1.0, -1.0],
 
-        ambient: [1.0, 1.0, 1.0],
+        ambient: [0.0, 0.0, 0.0],
         diffuse: [1.0, 1.0, 1.0],
         specular: [1.0, 1.0, 1.0],
     };
@@ -226,7 +163,8 @@ fn demo_3d() {
     unsafe { 
         // Use shader program
         gl::UseProgram(program.0); 
-        gl::BindFragDataLocation(program.0, 0, CString::new("color").unwrap().as_ptr());
+        let color = CString::new("color").unwrap();
+        gl::BindFragDataLocation(program.0, 0, color.as_ptr());
 
         s.bind_attributes(&program);
     }
@@ -234,7 +172,7 @@ fn demo_3d() {
     s.set_scaling(generate_scale(&[0.5; 3]));
     s.set_translation(generate_translate(None, None, Some(2.0)));
 
-    scene.add_shape(s, program);
+    scene.add_shape(s, program); 
 
     let mut t: f32 = 0.0;
     let delta: f32 = 0.02;

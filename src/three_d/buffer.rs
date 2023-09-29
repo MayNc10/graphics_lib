@@ -1,5 +1,5 @@
 use gl::types::*;
-use std::{mem, ops::Deref};
+use std::mem;
 use super::vao::VAOLock;
 
 pub type Vertex = [GLfloat; 3];
@@ -12,7 +12,7 @@ pub struct VertexBuffer {
 }
 
 impl VertexBuffer {
-    pub fn new(data: &[Vertex], vao_lock: &VAOLock) -> VertexBuffer {
+    pub fn new(data: &[Vertex], _vao_lock: &VAOLock) -> VertexBuffer {
         let mut id = 0;
         unsafe {
             gl::GenBuffers(1, &mut id);
@@ -44,7 +44,7 @@ pub struct NormalBuffer {
 }
 
 impl NormalBuffer {
-    pub fn new(data: &[Normal], vao_lock: &VAOLock) -> NormalBuffer {
+    pub fn new(data: &[Normal], _vao_lock: &VAOLock) -> NormalBuffer {
         let mut id = 0;
         unsafe {
             gl::GenBuffers(1, &mut id);
@@ -77,7 +77,7 @@ pub struct IndexBuffer {
 }
 
 impl IndexBuffer {
-    pub fn new(data: &[GLuint], vao_lock: &VAOLock) -> IndexBuffer {
+    pub fn new(data: &[GLuint], _vao_lock: &VAOLock) -> IndexBuffer {
         let mut id = 0;
         unsafe {
             gl::GenBuffers(1, &mut id);
