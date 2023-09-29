@@ -1,15 +1,12 @@
 use gl::types::*;
 use std::ffi::CString;
-use std::mem;
 use std::ptr;
 use std::str;
-
-use image;
 
 use crate::matrix::*;
 use super::shaders::Program;
 use super::shaders::ShaderType;
-use super::{shaders, animation::Animation, buffer::*, VAO::*};
+use super::{shaders, animation::Animation, buffer::*, vao::*};
 
 pub mod importing;
 use importing::*;
@@ -87,26 +84,8 @@ pub struct Shape {
     shader_type: shaders::ShaderType,
     //bface_culling: glium::draw_parameters::BackfaceCullingMode,
 
-    pub material: Material,
-
+    material: Material,
 }
-
-/* 
-impl Shape {
-    pub fn new(positions: VertexBuffer<Vertex>, normals: VertexBuffer<Normal>, indices: IndexBuffer<u16>, 
-            shader_type: shaders::ShaderType, transform: Option<Transform>, animation: Option<Box<dyn Animation>>, bface_culling: bool, 
-            material: Material) -> Shape {
-
-        let bface_culling = if bface_culling {
-            glium::draw_parameters::BackfaceCullingMode::CullClockwise
-        } else {
-            glium::draw_parameters::BackfaceCullingMode::CullingDisabled
-        };
-
-        Shape { positions , normals, indices, transform: transform.unwrap_or_default(), animation, shader_type, bface_culling, material}
-    }
-}
-*/
 
 impl Shape {
     pub fn bind_attributes(&self, program: &Program) {
@@ -255,8 +234,6 @@ impl Shape {
 
             gl::BindVertexArray(0);
         }
-        
-
         
     }
 }

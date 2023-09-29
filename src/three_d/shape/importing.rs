@@ -192,7 +192,6 @@ impl Shape {
     pub fn from_obj(
         path: &str,
         shader_type: shaders::ShaderType,
-        // FIXME: We shouldn't have to specify a shader type and the program itself!
         transform: Option<Transform>, 
         animation: Option<Box<dyn Animation>>, 
         _bface_culling: bool,) -> Result<Shape, ImportError> 

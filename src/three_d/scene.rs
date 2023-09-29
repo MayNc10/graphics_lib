@@ -1,3 +1,7 @@
+use glutin::ContextWrapper;
+use glutin::PossiblyCurrent;
+use glutin::window;
+
 use super::shaders::Program;
 use super::shaders::compile_shader;
 use super::shaders::link_program;
@@ -6,87 +10,54 @@ use super::shape::Shape;
 use super::shaders;
 use crate::matrix::Mat4;
 
-pub struct Scene {
-    no_shading: (Vec<Shape>, Program),
-    //gouraud_shading: (Vec<Shape>, Program),
-    //blinn_phong_shading: (Vec<Shape>, Program),
+type ObjectCollection = (Vec<Shape>, &'static Program);
 
+pub struct Scene {
+    objects: Vec<ObjectCollection>,
     view: Mat4,
     light: Light,
 }
 
 impl Scene {
-    pub fn new(view: Mat4, light: Light) -> Scene {
-        /* 
-        let no_shading =  glium::Program::from_source(
-            display, shaders::DEFAULT_3D_SHADER, 
-            shaders::DEFAULT_3D_FRAG_SHADER, None
-        ).unwrap();
-    
-        let gouraud_shading = glium::Program::from_source(
-        display, shaders::GOURAUD_3D_SHADER, 
-            shaders::GOURAUD_3D_FRAG_SHADER, None
-        ).unwrap();
-        
-        let blinn_phong_shading = glium::Program::from_source(
-            display, shaders::BLINN_PHONG_3D_SHADER, 
-            shaders::BLINN_PHONG_3D_FRAG_SHADER, None
-        ).unwrap();
-        */
-        let no_shading = link_program(
-            compile_shader(shaders::DEFAULT_3D_SHADER, shaders::ShaderProgramType::Vertex),
-            compile_shader(shaders::DEFAULT_3D_FRAG_SHADER, shaders::ShaderProgramType::Fragment)
-        );
+    pub fn new(view: Mat4, light: Light) -> Scene { 
+        let objects = Vec::new();
 
-        Scene 
-        {   no_shading: (Vec::new(), no_shading), 
-            //gouraud_shading: (Vec::new(), gouraud_shading), 
-            //blinn_phong_shading: (Vec::new(), blinn_phong_shading), 
-            view, light
-        }
+        Scene { objects, view, light }
     }
 
-    /// Returns the index into the vector where the shape is located
-    pub fn add_shape(&mut self, shape: Shape) -> usize {
-        let add_to_vec = |v: &mut Vec<Shape>, shape: Shape| {
-            v.push(shape);
-            v.len() - 1
-        };
-
-        add_to_vec(match shape.shader_type {
-            /* 
-            shaders::ShaderType::None => {
-                &mut self.no_shading.0
-            },
-            shaders::ShaderType::Gouraud => {
-                &mut self.gouraud_shading.0
-            },
-            shaders::ShaderType::BlinnPhong => {
-                &mut self.blinn_phong_shading.0
-            },
-            */
-            _ => &mut self.no_shading.0,
-        }, shape)
+    /// Returns the index of the vector where the shape is stored, as well as the index in that vector
+    pub fn add_shape(&mut self, shape: Shape, program: &'static Program) -> (usize, usize) {
+        let mut i = 0; 
+        for (v, p) in &mut self.objects {
+            if *p == program {
+                v.push(shape);
+                return (i, v.len() - 1);
+            }
+            i += 1;
+        } 
+        let v = Vec::from([shape]);
+        self.objects.push((v, program));
+        return (i, 0);
     }
 }
 
+type Window = ContextWrapper<PossiblyCurrent, window::Window>;
+
 impl Scene {
-    pub fn draw(&mut self, t: f32, dims: (f32, f32)) {
-        for shape in &mut self.no_shading.0 {
-            shape.animate(t);
-            shape.draw(&self.light, &self.view, &self.no_shading.1, dims);
+    pub fn draw(&mut self, t: f32, dims: (f32, f32), gl_window: &Window) {
+        unsafe {
+            // Clear the screen to black
+            gl::ClearColor(0.3, 0.3, 0.3, 1.0);
+            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
 
-        /* 
-        for shape in &mut self.gouraud_shading.0 {
-            shape.animate(t);
-            shape.draw( &self.light, &self.view, &self.gouraud_shading.1);
+        for object_collection in &mut self.objects {
+            for shape in &mut object_collection.0 {
+                shape.animate(t);
+                shape.draw(&self.light, &self.view, &object_collection.1, dims); 
+            }
         }
 
-        for shape in &mut self.blinn_phong_shading.0 {
-            shape.animate(t);
-            shape.draw(&self.light, &self.view, &self.blinn_phong_shading.1);
-        }
-        */
+        gl_window.swap_buffers().unwrap();
     }
 }

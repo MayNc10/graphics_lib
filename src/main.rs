@@ -1,7 +1,8 @@
 use glutin::{*, event_loop::EventLoop};
 use gl::types::*;
-use graphics_lib::three_d::VAO::VAOLock;
-use graphics_lib::three_d::VAO::VertexArrayObject;
+use graphics_lib::three_d::scene::Scene;
+use graphics_lib::three_d::vao::VAOLock;
+use graphics_lib::three_d::vao::VertexArrayObject;
 use graphics_lib::three_d::shape;
 use graphics_lib::three_d::shape::Light;
 use graphics_lib::three_d::shape::Shape;
@@ -195,10 +196,20 @@ fn demo_3d() {
         gl::DepthFunc(gl::LESS);
     }
 
+    let view = view_matrix(&[0.0, 0.0, 0.0], &[0.0, 0.0, 1.0], &[0.0, 1.0, 0.0]);
+
+    let light = Light {
+        direction: [1.0, 1.0, -1.0],
+
+        ambient: [1.0, 1.0, 1.0],
+        diffuse: [1.0, 1.0, 1.0],
+        specular: [1.0, 1.0, 1.0],
+    };
+
+    let mut scene = Scene::new(view, light);
+
     // Create GLSL shaders
-    let vs = compile_shader(shaders::BLINN_PHONG_3D_SHADER, shaders::ShaderProgramType::Vertex);
-    let fs = compile_shader(shaders::BLINN_PHONG_3D_FRAG_SHADER, shaders::ShaderProgramType::Fragment);
-    let program = link_program(vs, fs);
+    let program = &*shaders::BLINN_PHONG;
 
     let angle_func = |t: f32| { (t / 5.0) * 360.0 };
     let rotation_animation = 
@@ -212,9 +223,6 @@ fn demo_3d() {
         false, 
     ).unwrap();
 
-    println!("Torus Material: {:?}", s.material);
-
-
     unsafe { 
         // Use shader program
         gl::UseProgram(program.0); 
@@ -226,13 +234,15 @@ fn demo_3d() {
     s.set_scaling(generate_scale(&[0.5; 3]));
     s.set_translation(generate_translate(None, None, Some(2.0)));
 
+    scene.add_shape(s, program);
+
     let mut t: f32 = 0.0;
     let delta: f32 = 0.02;
 
     let mut start_time = std::time::Instant::now();
 
 
-    let view = view_matrix(&[0.0, 0.0, 0.0], &[0.0, 0.0, 1.0], &[0.0, 1.0, 0.0]);
+   
 
     event_loop.run(move |event, _, control_flow| {
         
@@ -244,12 +254,6 @@ fn demo_3d() {
             Event::LoopDestroyed => return,
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => {
-                    // Cleanup
-                    unsafe {
-                        gl::DeleteProgram(program.0);
-                        gl::DeleteShader(fs.0);
-                        gl::DeleteShader(vs.0);
-                    }
                     *control_flow = ControlFlow::Exit
                 },
                 _ => (),
@@ -267,28 +271,11 @@ fn demo_3d() {
                     // Update time
                     t += delta;
 
-                    s.animate(t);
-
                     let dims = gl_window.window().inner_size();
-                    let dims = (dims.width as f32, dims.height as f32);
+                    let dims = (dims.width as f32, dims.height as f32);  
 
-                    let light = Light {
-                        direction: [1.0, 1.0, -1.0],
+                    scene.draw(t, dims, &gl_window);
 
-                        ambient: [1.0, 1.0, 1.0],
-                        diffuse: [1.0, 1.0, 1.0],
-                        specular: [1.0, 1.0, 1.0],
-                    };
-
-                    unsafe {
-                        // Clear the screen to black
-                        gl::ClearColor(0.3, 0.3, 0.3, 1.0);
-                        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-                    }
-
-                    s.draw(&light, &view, &program, dims);      
-                    
-                    gl_window.swap_buffers().unwrap();
 
                     start_time = std::time::Instant::now(); 
                 } 
@@ -318,100 +305,3 @@ fn demo_3d() {
         }
     });
 }
-
-/*
-// Create programs
-
-let light = Light {
-        direction: [1.0; 3],
-
-        ambient: [0.05; 3],
-        diffuse: [1.0; 3],
-        specular: [1.0; 3],
-    };
-    let view = view_matrix(&[0.0, 0.0, 0.0], &[0.0, 0.0, 1.0], &[0.0, 1.0, 0.0]);
-
-    let mut scene = three_d::scene::Scene::new(view, light);
-
-    let angle_func = |t: f32| { (t / 5.0) * 360.0 };
-    let rotation_animation = 
-        Box::new(animation::Rotation {ty: animation::RotationType::Y, angle_func}) as Box<dyn animation::Animation>;  
-
-    let mut cube = three_d::shape::Shape::from_obj("media\\square.obj", 
-        three_d::shaders::ShaderType::None, 
-        None, 
-        Some(rotation_animation), 
-        false).unwrap().pop().unwrap();
-
-    cube.set_scaling(generate_scale(&[0.3; 3]));
-    cube.set_translation(generate_translate(Some(0.5), None, Some(2.0)));
-    scene.add_shape(cube);
-
-
-    // t is our start time, delta is what we increase it by each time
-    let mut t: f32 = 0.0;
-    let delta: f32 = 0.02;
-
-    let mut start_time = std::time::Instant::now();
-
-    let mut vao = 0;
-    unsafe {
-        gl::GenVertexArrays(1, &mut vao);
-        gl::BindVertexArray(vao);
-    }
-
-    // Create the main event loop
-    
-    event_loop.run(move |event, _, control_flow| {
-        // Handle window closing events (return) and New events from the OS (return or ignore)
-        match event {
-            glutin::event::Event::WindowEvent { event, .. } => match event {
-                glutin::event::WindowEvent::CloseRequested => {
-                    *control_flow = glutin::event_loop::ControlFlow::Exit;
-                    return;
-                },
-                _ => return,
-            },
-            glutin::event::Event::NewEvents(cause) => match cause {
-                glutin::event::StartCause::ResumeTimeReached { .. } => (),
-                glutin::event::StartCause::Init => (),
-                _ => return,
-            },
-            glutin::event::Event::RedrawRequested(_) => {}
-            glutin::event::Event::RedrawEventsCleared => {}
-            _ => return,
-        }
-
-        // How long has this pass taken?
-        let elapsed_time = std::time::Instant::now().duration_since(start_time).as_millis() as u64;
-
-        // How long should we wait for to run at 60 fps?
-        let wait_millis = match 1000 / TARGET_FPS >= elapsed_time {
-            true => 1000 / TARGET_FPS - elapsed_time,
-            false => 0
-        };
-        if wait_millis != 0 {
-            let new_inst = start_time + std::time::Duration::from_millis(wait_millis);
-            // Wait that long
-            *control_flow =  glutin::event_loop::ControlFlow::WaitUntil(new_inst);
-            //println!("Hitting fps goal!");
-        }
-        else {
-            // Update time
-            t += delta;
-
-            // Create a drawing target
-            unsafe {
-                gl::ClearColor(0.0, 0.6, 0.3, 1.0);
-                gl::Clear(gl::COLOR_BUFFER_BIT);
-            }            
-
-            let size = gl_window.window().inner_size();
-            scene.draw(t, (size.height as f32, size.width as f32));
-            gl_window.swap_buffers().unwrap();
-
-            start_time = std::time::Instant::now();
-        }
-    });
-
-*/

@@ -1,4 +1,5 @@
 use gl::types::*;
+use lazy_static::lazy_static;
 use std::ffi::CString;
 use std::mem;
 use std::ptr;
@@ -31,11 +32,27 @@ pub const BLINN_PHONG_3D_SHADER: &str = include_str!("shaders/blinn_phong.glsl")
 
 pub const BLINN_PHONG_3D_FRAG_SHADER: &str = include_str!("shaders/blinn_phong_frag.glsl");
 
-#[derive(Copy, Clone)]
+#[derive(PartialEq, Eq)]
 pub struct Shader(pub GLuint);
 
-#[derive(Copy, Clone)]
+impl Drop for Shader {
+    fn drop(&mut self) {
+        unsafe {
+            gl::DeleteShader(self.0);
+        }
+    }
+}
+
+#[derive(PartialEq, Eq)]
 pub struct Program(pub GLuint);
+
+impl Drop for Program {
+    fn drop(&mut self) {
+        unsafe {
+            gl::DeleteProgram(self.0);
+        }
+    }
+}
 
 // TODO: Add more shader types!
 #[repr(u32)]
@@ -111,4 +128,12 @@ pub fn link_program(vs: Shader, fs: Shader) -> Program {
         }
         Program(program)
     }
+}
+
+lazy_static! {
+    pub static ref BLINN_PHONG: Program = {
+        let vs = compile_shader(BLINN_PHONG_3D_SHADER, ShaderProgramType::Vertex);
+        let fs = compile_shader(BLINN_PHONG_3D_FRAG_SHADER, ShaderProgramType::Fragment);
+        link_program(vs, fs)
+    };
 }

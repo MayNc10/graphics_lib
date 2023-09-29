@@ -1,6 +1,6 @@
 use gl::types::*;
 use std::{mem, ops::Deref};
-use super::VAO::VAOLock;
+use super::vao::VAOLock;
 
 pub type Vertex = [GLfloat; 3];
 
