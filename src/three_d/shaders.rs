@@ -31,6 +31,16 @@ pub const BLINN_PHONG_3D_SHADER: &str = include_str!("shaders/blinn_phong.glsl")
 
 pub const BLINN_PHONG_3D_FRAG_SHADER: &str = include_str!("shaders/blinn_phong_frag.glsl");
 
+pub const BLINN_PHONG_3D_PREPASS_SHADER: &str = include_str!("shaders/deferred/blinn_phong_prepass.glsl");
+
+pub const BLINN_PHONG_3D_PREPASS_FRAG_SHADER: &str = include_str!("shaders/deferred/blinn_phong_prepass_frag.glsl");
+
+pub const BLINN_PHONG_3D_LIGHTING_SHADER: &str = include_str!("shaders/deferred/blinn_phong_lighting.glsl");
+
+pub const BLINN_PHONG_3D_LIGHTING_FRAG_SHADER: &str = include_str!("shaders/deferred/blinn_phong_lighting_frag.glsl");
+
+pub const BLINN_PHONG_3D_POINT_LIGHTING_FRAG_SHADER: &str = include_str!("shaders/deferred/blinn_phong_point_light_frag.glsl");
+
 #[derive(PartialEq, Eq)]
 pub struct Shader(pub GLuint);
 
@@ -133,6 +143,24 @@ lazy_static! {
     pub static ref BLINN_PHONG: Program = {
         let vs = compile_shader(BLINN_PHONG_3D_SHADER, ShaderProgramType::Vertex);
         let fs = compile_shader(BLINN_PHONG_3D_FRAG_SHADER, ShaderProgramType::Fragment);
+        link_program(vs, fs)
+    };
+
+    pub static ref BLINN_PHONG_PREPASS: Program = {
+        let vs = compile_shader(BLINN_PHONG_3D_PREPASS_SHADER, ShaderProgramType::Vertex);
+        let fs = compile_shader(BLINN_PHONG_3D_PREPASS_FRAG_SHADER, ShaderProgramType::Fragment);
+        link_program(vs, fs)
+    };
+
+    pub static ref BLINN_PHONG_LIGHTING: Program = {
+        let vs = compile_shader(BLINN_PHONG_3D_LIGHTING_SHADER, ShaderProgramType::Vertex);
+        let fs = compile_shader(BLINN_PHONG_3D_LIGHTING_FRAG_SHADER, ShaderProgramType::Fragment);
+        link_program(vs, fs)
+    };
+
+    pub static ref BLINN_PHONG_POINT_LIGHTING: Program = {
+        let vs = compile_shader(BLINN_PHONG_3D_LIGHTING_SHADER, ShaderProgramType::Vertex);
+        let fs = compile_shader(BLINN_PHONG_3D_POINT_LIGHTING_FRAG_SHADER, ShaderProgramType::Fragment);
         link_program(vs, fs)
     };
 }

@@ -1,8 +1,13 @@
 use glutin::event_loop::EventLoop;
+use gl::types::*;
 use graphics_lib::three_d::scene::Scene;
 use graphics_lib::three_d::shape::Light;
 use graphics_lib::three_d::shape::Shape;
+
+
 use std::ffi::CString;
+use std::mem;
+use std::ptr;
 
 use graphics_lib::three_d::shaders::{*, self};
 //use graphics_lib::{three_d::shape::Light};
@@ -143,10 +148,142 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         specular: [1.0, 1.0, 1.0],
     };
 
+    let mut point_light =  Light {
+        direction: [-1.0, 1.0, -1.0], //MISNOMER IS POSITION
+
+        ambient: [0.0, 0.0, 0.0],
+        diffuse: [1.0, 1.0, 1.0],
+        specular: [1.0, 1.0, 1.0],
+    }.as_matrix();
+    point_light[1][3] = 1.0;
+    point_light[2][3] = 0.09;
+    point_light[3][3] = 0.032;
+
+
+    let mut quad_vao = 0;
+    let mut quad_vbo = 0;
+    unsafe {
+        let quad_vertices = [
+            // positions        // texture Coords
+            -1.0,  1.0, 0.0,
+            -1.0, -1.0, 0.0,
+            1.0,  1.0, 0.0, 
+            1.0, -1.0, 0.0_f32,
+        ];
+
+        // setup plane VAO
+        gl::GenVertexArrays(1, &mut quad_vao);
+        gl::GenBuffers(1, &mut quad_vbo);
+        gl::BindVertexArray(quad_vao);
+        gl::BindBuffer(gl::ARRAY_BUFFER, quad_vbo);
+        gl::BufferData(gl::ARRAY_BUFFER, mem::size_of_val(&quad_vertices) as isize, &quad_vertices[0] as *const f32 as *const GLvoid, 
+            gl::STATIC_DRAW);
+        gl::EnableVertexAttribArray(0);
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 3 * mem::size_of::<GLfloat>() as i32, 
+            ptr::null());
+    }
+
+    let dims = gl_window.window().inner_size();
+    let dims = (dims.width as f32, dims.height as f32);  
+
+    let mut g_buffer = 0;
+    let mut g_position = 0;
+    let mut g_normal = 0;
+    let mut g_color_diffuse = 0;
+    let mut g_color_emission = 0;
+    let mut g_color_specular = 0;
+    unsafe {
+        gl::GenFramebuffers(1, &mut g_buffer);
+        gl::BindFramebuffer(gl::FRAMEBUFFER, g_buffer);
+        
+        // - position color buffer
+        gl::GenTextures(1, &mut g_position);
+        gl::BindTexture(gl::TEXTURE_2D, g_position);
+        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA16F as i32, dims.0 as i32, dims.1 as i32, 0, 
+            gl::RGBA, gl::FLOAT, ptr::null());
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+        gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::TEXTURE_2D, g_position, 0);
+        
+        // - normal color buffer
+        gl::GenTextures(1, &mut g_normal);
+        gl::BindTexture(gl::TEXTURE_2D, g_normal);
+        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA16F as i32, dims.0 as i32, dims.1 as i32, 0, 
+            gl::RGBA, gl::FLOAT, ptr::null());
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+        gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT1, gl::TEXTURE_2D, g_normal, 0);
+        
+        // - diffuse color buffer
+        gl::GenTextures(1, &mut g_color_diffuse);
+        gl::BindTexture(gl::TEXTURE_2D, g_color_diffuse);
+        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as i32, dims.0 as i32, dims.1 as i32, 0, 
+            gl::RGBA, gl::FLOAT, ptr::null());
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+        gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT2, gl::TEXTURE_2D, g_color_diffuse, 0);
+
+        // Emmision color buffer
+        gl::GenTextures(1, &mut g_color_emission);
+        gl::BindTexture(gl::TEXTURE_2D, g_color_emission);
+        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as i32, dims.0 as i32, dims.1 as i32, 0, 
+            gl::RGBA, gl::FLOAT, ptr::null());
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+        gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT3, gl::TEXTURE_2D, g_color_emission, 0);
+
+        // Specular color buffer
+        gl::GenTextures(1, &mut g_color_specular);
+        gl::BindTexture(gl::TEXTURE_2D, g_color_specular);
+        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as i32, dims.0 as i32, dims.1 as i32, 0, 
+            gl::RGBA, gl::FLOAT, ptr::null());
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+        gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT4, gl::TEXTURE_2D, g_color_specular, 0);
+        
+        // - tell OpenGL which color attachments we'll use (of this framebuffer) for rendering 
+        let attachments = [gl::COLOR_ATTACHMENT0, gl::COLOR_ATTACHMENT1, gl::COLOR_ATTACHMENT2, 
+            gl::COLOR_ATTACHMENT3, gl::COLOR_ATTACHMENT4];
+        gl::DrawBuffers(5, &attachments[0] as *const u32);
+        
+        let mut rbo_depth = 0;
+        gl::GenRenderbuffers(1, &mut rbo_depth);
+        gl::BindRenderbuffer(gl::RENDERBUFFER, rbo_depth);
+        gl::RenderbufferStorage(gl::RENDERBUFFER, gl::DEPTH_COMPONENT, dims.0 as i32, dims.1 as i32);
+        gl::FramebufferRenderbuffer(gl::FRAMEBUFFER, gl::DEPTH_ATTACHMENT, gl::RENDERBUFFER, rbo_depth);
+        // finally check if framebuffer is complete
+        if gl::CheckFramebufferStatus(gl::FRAMEBUFFER) != gl::FRAMEBUFFER_COMPLETE {
+            println!("Framebuffer not complete!");
+        }
+            
+        gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+    }
+    
+
     let mut scene = Scene::new(view, light);
 
     // Create GLSL shaders
     let program = &*shaders::BLINN_PHONG;
+
+    let prepass_program = &*shaders::BLINN_PHONG_PREPASS;
+
+    let lighting_program = &*shaders::BLINN_PHONG_LIGHTING;
+
+    let point_lighting_program = &*shaders::BLINN_PHONG_POINT_LIGHTING;
+
+    unsafe {
+        gl::UseProgram(lighting_program.0); 
+        let color = CString::new("color").unwrap();
+        gl::BindFragDataLocation(lighting_program.0, 0, color.as_ptr());
+
+        gl::UseProgram(0);
+
+        gl::UseProgram(point_lighting_program.0); 
+        let color = CString::new("color").unwrap();
+        gl::BindFragDataLocation(point_lighting_program.0, 0, color.as_ptr());
+
+        gl::UseProgram(0);
+    }
 
     let angle_func = |t: f32| { (t / 5.0) * 360.0 };
     let rotation_animation = 
@@ -179,12 +316,8 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
 
     let mut start_time = std::time::Instant::now();
 
-
-   
-
     event_loop.run(move |event, _, control_flow| {
         
-
         use glutin::event::{Event, WindowEvent};
         use glutin::event_loop::ControlFlow;
         *control_flow = ControlFlow::Wait;
@@ -212,7 +345,13 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
                     let dims = gl_window.window().inner_size();
                     let dims = (dims.width as f32, dims.height as f32);  
 
-                    scene.draw(t, dims, &gl_window);
+                    //scene.draw(t, dims, &gl_window);
+                    unsafe {
+                        gl::UseProgram(prepass_program.0);
+                    }
+                    scene.draw_deferred(t, dims, &gl_window, prepass_program, lighting_program, quad_vao, 
+                    g_buffer, g_position, g_normal, g_color_diffuse, g_color_emission, g_color_specular, 
+                    point_lighting_program, &[point_light]);
 
 
                     start_time = std::time::Instant::now(); 
