@@ -196,7 +196,8 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     }
 
     let dims = gl_window.window().inner_size();
-    let dims = (dims.width as f32, dims.height as f32);  
+    let width = dims.width as i32;
+    let height = dims.height as i32;
 
     let mut g_buffer = 0;
     let mut g_position = 0;
@@ -211,7 +212,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         // - position color buffer
         gl::GenTextures(1, &mut g_position);
         gl::BindTexture(gl::TEXTURE_2D, g_position);
-        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA16F as i32, dims.0 as i32, dims.1 as i32, 0, 
+        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA16F as i32, width, height, 0, 
             gl::RGBA, gl::FLOAT, ptr::null());
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
@@ -220,7 +221,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         // - normal color buffer
         gl::GenTextures(1, &mut g_normal);
         gl::BindTexture(gl::TEXTURE_2D, g_normal);
-        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA16F as i32, dims.0 as i32, dims.1 as i32, 0, 
+        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA16F as i32, width, height, 0, 
             gl::RGBA, gl::FLOAT, ptr::null());
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
@@ -229,7 +230,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         // - diffuse color buffer
         gl::GenTextures(1, &mut g_color_diffuse);
         gl::BindTexture(gl::TEXTURE_2D, g_color_diffuse);
-        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as i32, dims.0 as i32, dims.1 as i32, 0, 
+        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as i32, width, height, 0, 
             gl::RGBA, gl::FLOAT, ptr::null());
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
@@ -238,7 +239,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         // Emmision color buffer
         gl::GenTextures(1, &mut g_color_emission);
         gl::BindTexture(gl::TEXTURE_2D, g_color_emission);
-        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as i32, dims.0 as i32, dims.1 as i32, 0, 
+        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as i32, width, height, 0, 
             gl::RGBA, gl::FLOAT, ptr::null());
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
@@ -247,7 +248,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         // Specular color buffer
         gl::GenTextures(1, &mut g_color_specular);
         gl::BindTexture(gl::TEXTURE_2D, g_color_specular);
-        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as i32, dims.0 as i32, dims.1 as i32, 0, 
+        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as i32, width, height, 0, 
             gl::RGBA, gl::FLOAT, ptr::null());
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
@@ -261,7 +262,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         let mut rbo_depth = 0;
         gl::GenRenderbuffers(1, &mut rbo_depth);
         gl::BindRenderbuffer(gl::RENDERBUFFER, rbo_depth);
-        gl::RenderbufferStorage(gl::RENDERBUFFER, gl::DEPTH_COMPONENT, dims.0 as i32, dims.1 as i32);
+        gl::RenderbufferStorage(gl::RENDERBUFFER, gl::DEPTH_COMPONENT, width, height);
         gl::FramebufferRenderbuffer(gl::FRAMEBUFFER, gl::DEPTH_ATTACHMENT, gl::RENDERBUFFER, rbo_depth);
         // finally check if framebuffer is complete
         if gl::CheckFramebufferStatus(gl::FRAMEBUFFER) != gl::FRAMEBUFFER_COMPLETE {
