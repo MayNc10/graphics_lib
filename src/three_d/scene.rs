@@ -3,6 +3,7 @@ use glutin::PossiblyCurrent;
 use glutin::window;
 use gl::types::*;
 
+use super::buffer::FrameBuffer;
 use super::shaders::Program;
 use super::lights::{DirectionLight, PointLight};
 use super::shape::Shape;
@@ -62,14 +63,13 @@ impl Scene {
         gl_window.swap_buffers().unwrap();
     }
 
-    pub fn draw_deferred(&mut self, t: f32, dims: (f32, f32), gl_window: &Window, prepass_prog: &Program, lighting_prog: &Program, 
-        quad_vao: u32, g_buffer: u32, g_position: u32, g_normal: u32, g_color_diffuse: u32, g_color_emission: u32, g_color_specular: u32, 
-        point_lighting_prog: &Program) 
+    pub fn draw_deferred(&mut self, t: f32, dims: (f32, f32), gl_window: &Window, prepass_prog: &Program, lighting_prog: &Program,
+        point_lighting_prog: &Program, quad_vao: u32, frame_buffer: &FrameBuffer) 
     {
         unsafe {
             gl::UseProgram(prepass_prog.0);
 
-            gl::BindFramebuffer(gl::FRAMEBUFFER, g_buffer);
+            frame_buffer.bind();
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
             gl::ClearColor(0.0, 0.0, 0.0, 0.0);
 
@@ -85,43 +85,27 @@ impl Scene {
             }
 
             gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
-
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
             gl::ClearColor(0.0, 0.0, 0.0, 1.0);
 
             gl::UseProgram(lighting_prog.0);
-            gl::ActiveTexture(gl::TEXTURE0);
-            gl::BindTexture(gl::TEXTURE_2D, g_position);
-            gl::ActiveTexture(gl::TEXTURE1);
-            gl::BindTexture(gl::TEXTURE_2D, g_normal);
-            gl::ActiveTexture(gl::TEXTURE2);
-            gl::BindTexture(gl::TEXTURE_2D, g_color_diffuse);
-            gl::ActiveTexture(gl::TEXTURE3);
-            gl::BindTexture(gl::TEXTURE_2D, g_color_emission);
-            gl::ActiveTexture(gl::TEXTURE4);
-            gl::BindTexture(gl::TEXTURE_2D, g_color_specular);
+            frame_buffer.bind_textures();
 
             let g_position_handle_name = CString::new("gPosition").unwrap();
             let g_normal_handle_name = CString::new("gNormal").unwrap();
             let g_color_diffuse_handle_name = CString::new("gColorDiffuse").unwrap();
             let g_color_emission_handle_name = CString::new("gColorEmission").unwrap();
             let g_color_specular_handle_name = CString::new("gColorSpecular").unwrap();
+
+            let fb_names = [g_position_handle_name, g_normal_handle_name, g_color_diffuse_handle_name, 
+                g_color_emission_handle_name, g_color_specular_handle_name];
+
+            frame_buffer.add_uniforms(&fb_names, &lighting_prog);
+
             let light_handle_name = CString::new("light").unwrap();
-
-            let g_position_handle = gl::GetUniformLocation(lighting_prog.0, g_position_handle_name.as_ptr());
-            let g_normal_handle = gl::GetUniformLocation(lighting_prog.0, g_normal_handle_name.as_ptr());
-            let g_color_diffuse_handle = gl::GetUniformLocation(lighting_prog.0, g_color_diffuse_handle_name.as_ptr());
-            let g_color_emission_handle = gl::GetUniformLocation(lighting_prog.0, g_color_emission_handle_name.as_ptr());
-            let g_color_specular_handle = gl::GetUniformLocation(lighting_prog.0, g_color_specular_handle_name.as_ptr());
             let light_handle = gl::GetUniformLocation(lighting_prog.0, light_handle_name.as_ptr());
-
-            gl::Uniform1i(g_position_handle, 0);
-            gl::Uniform1i(g_normal_handle, 1);
-            gl::Uniform1i(g_color_diffuse_handle, 2);
-            gl::Uniform1i(g_color_emission_handle, 3);
-            gl::Uniform1i(g_color_specular_handle, 4);
-
             let light_mat = self.direction_lights[0].as_matrix();
+
             gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light_mat[0] as *const GLfloat);   
 
             gl::BindVertexArray(quad_vao);
@@ -141,17 +125,7 @@ impl Scene {
             }
 
             gl::UseProgram(point_lighting_prog.0);
-            let g_position_handle = gl::GetUniformLocation(point_lighting_prog.0, g_position_handle_name.as_ptr());
-            let g_normal_handle = gl::GetUniformLocation(point_lighting_prog.0, g_normal_handle_name.as_ptr());
-            let g_color_diffuse_handle = gl::GetUniformLocation(point_lighting_prog.0, g_color_diffuse_handle_name.as_ptr());
-            let g_color_emission_handle = gl::GetUniformLocation(point_lighting_prog.0, g_color_emission_handle_name.as_ptr());
-            let g_color_specular_handle = gl::GetUniformLocation(point_lighting_prog.0, g_color_specular_handle_name.as_ptr());
-
-            gl::Uniform1i(g_position_handle, 0);
-            gl::Uniform1i(g_normal_handle, 1);
-            gl::Uniform1i(g_color_diffuse_handle, 2);
-            gl::Uniform1i(g_color_emission_handle, 3);
-            gl::Uniform1i(g_color_specular_handle, 4);
+            frame_buffer.add_uniforms(&fb_names, &point_lighting_prog);
 
             let light_handle = gl::GetUniformLocation(point_lighting_prog.0, light_handle_name.as_ptr());
 
