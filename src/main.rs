@@ -359,10 +359,6 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
                     let dims = gl_window.window().inner_size();
                     let dims = (dims.width as f32, dims.height as f32);  
 
-                    //scene.draw(t, dims, &gl_window);
-                    unsafe {
-                        gl::UseProgram(prepass_program.0);
-                    }
                     scene.draw_deferred(t, dims, &gl_window, prepass_program, lighting_program, quad_vao, 
                     g_buffer, g_position, g_normal, g_color_diffuse, g_color_emission, g_color_specular, 
                     point_lighting_program);

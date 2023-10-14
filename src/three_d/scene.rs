@@ -67,6 +67,8 @@ impl Scene {
         point_lighting_prog: &Program) 
     {
         unsafe {
+            gl::UseProgram(prepass_prog.0);
+
             gl::BindFramebuffer(gl::FRAMEBUFFER, g_buffer);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
             gl::ClearColor(0.0, 0.0, 0.0, 0.0);
