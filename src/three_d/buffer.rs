@@ -114,7 +114,7 @@ pub struct FrameBuffer {
     color_emission_id: GLuint,
     color_specular_id: GLuint,
 
-    _rbo_depth_id: GLuint,
+    rbo_depth_id: GLuint,
 }
 
 impl FrameBuffer {
@@ -192,7 +192,7 @@ impl FrameBuffer {
                 
             gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
         }
-        FrameBuffer { buffer_id, position_id, normal_id, color_diffuse_id, color_emission_id, color_specular_id, _rbo_depth_id: rbo_depth_id}
+        FrameBuffer { buffer_id, position_id, normal_id, color_diffuse_id, color_emission_id, color_specular_id, rbo_depth_id}
     }
 
     pub fn bind_textures(&self) {
@@ -234,3 +234,19 @@ impl FrameBuffer {
     }
 }
 
+impl Drop for FrameBuffer {
+    fn drop(&mut self) {
+        unsafe {
+            gl::DeleteRenderbuffers(1, &self.rbo_depth_id as *const GLuint);
+            let textures = [
+                self.position_id,
+                self.normal_id,
+                self.color_diffuse_id,
+                self.color_emission_id,
+                self.color_specular_id,
+            ];
+            gl::DeleteTextures(textures.len() as GLsizei, textures.as_ptr());
+            gl::DeleteFramebuffers(1, &self.buffer_id as *const GLuint);
+        }
+    }
+}
