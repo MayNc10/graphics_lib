@@ -55,6 +55,16 @@ impl Drop for Shader {
 #[derive(PartialEq, Eq)]
 pub struct Program(pub GLuint);
 
+impl Program {
+    pub fn bind_color_output(&self, name: &CString) {
+        unsafe {
+            gl::UseProgram(self.0); 
+            gl::BindFragDataLocation(self.0, 0, name.as_ptr());
+            gl::UseProgram(0);
+        }
+    }
+}
+
 impl Drop for Program {
     fn drop(&mut self) {
         unsafe {

@@ -5,7 +5,6 @@ use graphics_lib::three_d::scene::Scene;
 use graphics_lib::three_d::lights::{DirectionLight, PointLight};
 use graphics_lib::three_d::shape::Shape;
 
-
 use std::ffi::CString;
 use std::mem;
 use std::ptr;
@@ -214,19 +213,11 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
 
     let point_lighting_program = &*shaders::BLINN_PHONG_POINT_LIGHTING;
 
-    unsafe {
-        gl::UseProgram(lighting_program.0); 
-        let color = CString::new("color").unwrap();
-        gl::BindFragDataLocation(lighting_program.0, 0, color.as_ptr());
+    let color_name = CString::new("color").unwrap();
 
-        gl::UseProgram(0);
-
-        gl::UseProgram(point_lighting_program.0); 
-        let color = CString::new("color").unwrap();
-        gl::BindFragDataLocation(point_lighting_program.0, 0, color.as_ptr());
-
-        gl::UseProgram(0);
-    }
+    lighting_program.bind_color_output(&color_name);
+    point_lighting_program.bind_color_output(&color_name);
+    program.bind_color_output(&color_name);
 
     let angle_func = |t: f32| { (-t / 5.0) * 360.0 };
     let rotation_animation = 
@@ -240,14 +231,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         false, 
     ).unwrap();
 
-    unsafe { 
-        // Use shader program
-        gl::UseProgram(program.0); 
-        let color = CString::new("color").unwrap();
-        gl::BindFragDataLocation(program.0, 0, color.as_ptr());
-
-        s.bind_attributes(&program);
-    }
+    s.bind_attributes(&program);
 
     s.set_scaling(generate_scale(&[0.5; 3]));
     s.set_translation(generate_translate(None, None, Some(-2.0)));
@@ -258,8 +242,6 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     let delta: f32 = 0.02;
 
     let mut start_time = std::time::Instant::now();
-
-    
 
     event_loop.run(move |event, _, control_flow| {
         
@@ -294,7 +276,6 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
                         prepass_program, lighting_program, point_lighting_program, 
                         quad_vao, &frame_buffer
                     );
-
 
                     start_time = std::time::Instant::now(); 
                 } 
