@@ -141,7 +141,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     let view = view_matrix(&[0.0, 0.0, 0.0], &[0.0, 0.0, 1.0], &[0.0, 1.0, 0.0]);
 
     let light = Light {
-        direction: [-1.0, -1.0, 1.0],
+        direction: [-1.0, -1.0, -1.0],
 
         ambient: [0.05, 0.05, 0.05],
         diffuse: [0.4, 0.4, 0.4],
@@ -149,7 +149,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     };
 
     let mut point_light = Light {
-        direction: [-1.0, 1.0, 1.0], //MISNOMER IS POSITION
+        direction: [-1.0, 1.0, -1.0], //MISNOMER IS POSITION
 
         ambient: [0.05, 0.05, 0.05],
         diffuse: [0.8, 0.8, 0.8],
@@ -160,7 +160,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     point_light[3][3] = 0.032;
 
     let mut point_light_2 = Light {
-        direction: [1.0, 1.0, 1.0], //MISNOMER IS POSITION
+        direction: [1.0, 1.0, -1.0], //MISNOMER IS POSITION
 
         ambient: [0.05, 0.05, 0.05],
         diffuse: [0.8, 0.8, 0.8],
@@ -296,7 +296,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         gl::UseProgram(0);
     }
 
-    let angle_func = |t: f32| { (t / 5.0) * 360.0 };
+    let angle_func = |t: f32| { (-t / 5.0) * 360.0 };
     let rotation_animation = 
         Box::new(three_d::animation::Rotation {ty: three_d::animation::RotationType::X, angle_func}) as Box<dyn three_d::animation::Animation>;  
 
@@ -318,7 +318,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     }
 
     s.set_scaling(generate_scale(&[0.5; 3]));
-    s.set_translation(generate_translate(None, None, Some(2.0)));
+    s.set_translation(generate_translate(None, None, Some(-2.0)));
 
     scene.add_shape(s, program); 
 
@@ -326,6 +326,8 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     let delta: f32 = 0.02;
 
     let mut start_time = std::time::Instant::now();
+
+    
 
     event_loop.run(move |event, _, control_flow| {
         

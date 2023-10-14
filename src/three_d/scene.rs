@@ -85,10 +85,6 @@ impl Scene {
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
             gl::ClearColor(0.0, 0.0, 0.0, 1.0);
 
-            /* 
-            
-            */
-
             gl::UseProgram(lighting_prog.0);
             gl::ActiveTexture(gl::TEXTURE0);
             gl::BindTexture(gl::TEXTURE_2D, g_position);

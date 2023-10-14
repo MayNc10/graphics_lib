@@ -12,8 +12,8 @@ pub mod importing;
 use importing::*;
 
 pub const FOV: f32 = std::f32::consts::PI / 3.0;
-pub const ZFAR: f32 = 1024.0;
-pub const ZNEAR: f32 = 0.1;
+pub const ZFAR: f32 = -1024.0;
+pub const ZNEAR: f32 = -0.1;
 
 //const EPSILON: f32 = 1e-3;
 
@@ -184,12 +184,14 @@ impl Shape {
 
             let f = 1.0 / (FOV / 2.0).tan();
 
+            
             [
-                [f *   aspect_ratio   ,    0.0,              0.0              ,   0.0],
+                [f  *  aspect_ratio   ,    0.0,              0.0              ,   0.0],
                 [         0.0         ,     f ,              0.0              ,   0.0],
-                [         0.0         ,    0.0,  (ZFAR+ZNEAR)/(ZFAR-ZNEAR)    ,   1.0],
-                [         0.0         ,    0.0, -(2.0*ZFAR*ZNEAR)/(ZFAR-ZNEAR),   0.0],
+                [         0.0         ,    0.0,  -(ZFAR+ZNEAR)/(ZFAR-ZNEAR)    ,   -1.0],
+                [         0.0         ,    0.0, (2.0*ZFAR*ZNEAR)/(ZFAR-ZNEAR),   0.0],
             ]
+            
         };
         unsafe {
             gl::BindVertexArray(*self.vao.id());
