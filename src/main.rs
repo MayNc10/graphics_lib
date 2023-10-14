@@ -208,10 +208,28 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
 
     s.bind_attributes(&program);
 
-    s.set_scaling(generate_scale(&[0.5; 3]));
-    s.set_translation(generate_translate(None, None, Some(-2.0)));
+    s.set_scaling(generate_scale(&[0.33; 3]));
+    s.set_translation(generate_translate(Some(-0.5), None, Some(-2.0)));
 
     scene.add_shape(s, program); 
+
+    let rotation_animation = 
+        Box::new(three_d::animation::Rotation {ty: three_d::animation::RotationType::Z, angle_func}) as Box<dyn three_d::animation::Animation>;  
+
+    let mut monkey = Shape::from_obj(
+        "media\\monkey.obj", 
+        ShaderType::BlinnPhong, 
+        None, 
+        Some(rotation_animation), 
+        false, 
+    ).unwrap();
+
+    monkey.bind_attributes(&program);
+
+    monkey.set_scaling(generate_scale(&[0.33; 3]));
+    monkey.set_translation(generate_translate(Some(0.5), None, Some(-2.0)));
+
+    scene.add_shape(monkey, program); 
 
     let mut t: f32 = 0.0;
     let delta: f32 = 0.02;
