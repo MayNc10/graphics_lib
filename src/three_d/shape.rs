@@ -157,6 +157,7 @@ impl Shape {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Light {
     pub direction: [f32; 3],
 

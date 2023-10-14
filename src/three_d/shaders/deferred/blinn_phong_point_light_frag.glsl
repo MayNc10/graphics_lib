@@ -28,20 +28,19 @@ vec3 CalcPointLight(mat4 light, vec3 normal, vec3 fragPos, vec3 viewDir)
 {
     vec3 lightDir = normalize(light[0].xyz - fragPos);
     // diffuse shading
-    float diff = max(dot(normal, lightDir), 0.0);
+    float diff = max(dot(normal, lightDir), 0);
     // specular shading
     vec3 reflectDir = reflect(-lightDir, normal);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), texture(gColorSpecular, TexCoords).w * 1000.0);
+    float specular_exp = texture(gColorSpecular, TexCoords).w * 1000.0;
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), specular_exp);
     // attenuation
-    float distance    = length(light[0].xyz - fragPos);
-    float attenuation = 1.0 / (light[1].w + light[2].w * distance + 
-  			     light[3].w * (distance * distance));    
+    float distance = length(light[0].xyz - fragPos);
+    float attenuation = 1.0 / (light[1].w + light[2].w * distance + light[3].w * (distance * distance));    
     // combine results
-    vec3 ambient  = light[1].xyz  * vec3(texture(gColorDiffuse, TexCoords));
-    vec3 diffuse  = light[2].xyz  * diff * vec3(texture(gColorDiffuse, TexCoords));
+    vec3 diffuse = light[2].xyz * diff * texture(gColorDiffuse, TexCoords).rgb;
     vec3 specular = light[3].xyz * spec * vec3(texture(gColorSpecular, TexCoords));
-    ambient  *= attenuation;
-    diffuse  *= attenuation;
+    //ambient  *= attenuation;
+    diffuse *= attenuation;
     specular *= attenuation;
-    return (ambient + diffuse + specular + texture(gColorEmission, TexCoords).xyz);
+    return (diffuse + specular);
 } 

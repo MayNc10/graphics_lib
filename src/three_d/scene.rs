@@ -68,6 +68,7 @@ impl Scene {
         unsafe {
             gl::BindFramebuffer(gl::FRAMEBUFFER, g_buffer);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+            gl::ClearColor(0.0, 0.0, 0.0, 0.0);
 
             for collection in &mut self.objects {
                 for shape in &mut collection.0 {
@@ -81,8 +82,12 @@ impl Scene {
 
             gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
 
-            gl::ClearColor(0.3, 0.3, 0.3, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+            gl::ClearColor(0.0, 0.0, 0.0, 1.0);
+
+            /* 
+            
+            */
 
             gl::UseProgram(lighting_prog.0);
             gl::ActiveTexture(gl::TEXTURE0);
@@ -117,22 +122,32 @@ impl Scene {
             gl::Uniform1i(g_color_specular_handle, 4);
 
             let light_mat = self.light.as_matrix();
-            gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light_mat[0] as *const GLfloat);
-            
-            gl::Enable(gl::BLEND);
-            gl::BlendEquation(gl::FUNC_ADD);
-            gl::BlendColor(0.0, 0.0, 0.0, 0.5);
-            gl::BlendFunc(gl::CONSTANT_ALPHA, gl::ONE_MINUS_CONSTANT_ALPHA);
-            gl::DepthFunc(gl::LEQUAL);
+            gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light_mat[0] as *const GLfloat);   
 
             gl::BindVertexArray(quad_vao);
 
             gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
 
+            // Only enable blending after direct lighting calcuations bc we don't want to blend with the background
+            gl::Enable(gl::BLEND);
+            gl::BlendEquation(gl::FUNC_ADD);
             gl::BlendFunc(gl::ONE, gl::ONE);
+            gl::DepthFunc(gl::LEQUAL);
 
-            //gl::UseProgram(point_lighting_prog.0);
-            let light_handle = gl::GetUniformLocation(lighting_prog.0, light_handle_name.as_ptr());
+            gl::UseProgram(point_lighting_prog.0);
+            let g_position_handle = gl::GetUniformLocation(point_lighting_prog.0, g_position_handle_name.as_ptr());
+            let g_normal_handle = gl::GetUniformLocation(point_lighting_prog.0, g_normal_handle_name.as_ptr());
+            let g_color_diffuse_handle = gl::GetUniformLocation(point_lighting_prog.0, g_color_diffuse_handle_name.as_ptr());
+            let g_color_emission_handle = gl::GetUniformLocation(point_lighting_prog.0, g_color_emission_handle_name.as_ptr());
+            let g_color_specular_handle = gl::GetUniformLocation(point_lighting_prog.0, g_color_specular_handle_name.as_ptr());
+
+            gl::Uniform1i(g_position_handle, 0);
+            gl::Uniform1i(g_normal_handle, 1);
+            gl::Uniform1i(g_color_diffuse_handle, 2);
+            gl::Uniform1i(g_color_emission_handle, 3);
+            gl::Uniform1i(g_color_specular_handle, 4);
+
+            let light_handle = gl::GetUniformLocation(point_lighting_prog.0, light_handle_name.as_ptr());
 
             for light in point_lights {
                 gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light[0] as *const GLfloat);

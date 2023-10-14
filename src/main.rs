@@ -141,23 +141,34 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     let view = view_matrix(&[0.0, 0.0, 0.0], &[0.0, 0.0, 1.0], &[0.0, 1.0, 0.0]);
 
     let light = Light {
-        direction: [1.0, 1.0, -1.0],
+        direction: [-1.0, -1.0, 1.0],
 
-        ambient: [0.0, 0.0, 0.0],
-        diffuse: [1.0, 1.0, 1.0],
-        specular: [1.0, 1.0, 1.0],
+        ambient: [0.05, 0.05, 0.05],
+        diffuse: [0.4, 0.4, 0.4],
+        specular: [0.5, 0.5, 0.5],
     };
 
-    let mut point_light =  Light {
-        direction: [-1.0, 1.0, -1.0], //MISNOMER IS POSITION
+    let mut point_light = Light {
+        direction: [-1.0, 1.0, 1.0], //MISNOMER IS POSITION
 
-        ambient: [0.0, 0.0, 0.0],
-        diffuse: [1.0, 1.0, 1.0],
+        ambient: [0.05, 0.05, 0.05],
+        diffuse: [0.8, 0.8, 0.8],
         specular: [1.0, 1.0, 1.0],
     }.as_matrix();
     point_light[1][3] = 1.0;
     point_light[2][3] = 0.09;
     point_light[3][3] = 0.032;
+
+    let mut point_light_2 = Light {
+        direction: [1.0, 1.0, 1.0], //MISNOMER IS POSITION
+
+        ambient: [0.05, 0.05, 0.05],
+        diffuse: [0.8, 0.8, 0.8],
+        specular: [1.0, 1.0, 1.0],
+    }.as_matrix();
+    point_light_2[1][3] = 1.0;
+    point_light_2[2][3] = 0.09;
+    point_light_2[3][3] = 0.032;
 
 
     let mut quad_vao = 0;
@@ -351,7 +362,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
                     }
                     scene.draw_deferred(t, dims, &gl_window, prepass_program, lighting_program, quad_vao, 
                     g_buffer, g_position, g_normal, g_color_diffuse, g_color_emission, g_color_specular, 
-                    point_lighting_program, &[point_light]);
+                    point_lighting_program, &[point_light, point_light_2]);
 
 
                     start_time = std::time::Instant::now(); 
