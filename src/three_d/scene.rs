@@ -4,7 +4,7 @@ use glutin::window;
 use gl::types::*;
 
 use super::shaders::Program;
-use super::shape::Light;
+use super::lights::{DirectionLight, PointLight};
 use super::shape::Shape;
 use crate::matrix::Mat4;
 
@@ -15,14 +15,15 @@ type ObjectCollection = (Vec<Shape>, &'static Program);
 pub struct Scene {
     objects: Vec<ObjectCollection>,
     view: Mat4,
-    light: Light,
+    direction_lights: Vec<DirectionLight>,
+    point_lights: Vec<PointLight>,
 }
 
 impl Scene {
-    pub fn new(view: Mat4, light: Light) -> Scene { 
+    pub fn new(view: Mat4, direction_lights: Vec<DirectionLight>, point_lights: Vec<PointLight>) -> Scene { 
         let objects = Vec::new();
 
-        Scene { objects, view, light }
+        Scene { objects, view, direction_lights, point_lights }
     }
 
     /// Returns the index of the vector where the shape is stored, as well as the index in that vector
@@ -54,7 +55,7 @@ impl Scene {
         for object_collection in &mut self.objects {
             for shape in &mut object_collection.0 {
                 shape.animate(t);
-                shape.draw(&self.light, &self.view, &object_collection.1, dims); 
+                shape.draw(&self.direction_lights[0], &self.view, &object_collection.1, dims); 
             }
         }
 
@@ -63,7 +64,7 @@ impl Scene {
 
     pub fn draw_deferred(&mut self, t: f32, dims: (f32, f32), gl_window: &Window, prepass_prog: &Program, lighting_prog: &Program, 
         quad_vao: u32, g_buffer: u32, g_position: u32, g_normal: u32, g_color_diffuse: u32, g_color_emission: u32, g_color_specular: u32, 
-        point_lighting_prog: &Program, point_lights: &[[[GLfloat; 4]; 4]]) 
+        point_lighting_prog: &Program) 
     {
         unsafe {
             gl::BindFramebuffer(gl::FRAMEBUFFER, g_buffer);
@@ -76,7 +77,8 @@ impl Scene {
                     // And we've bound the framebuffer
                     // So we should be good to just call 'draw'
                     shape.animate(t);
-                    shape.draw(&self.light, &self.view, prepass_prog, dims);
+                    // The direction light is just a filler value, our program doesn't use it
+                    shape.draw(&self.direction_lights[0], &self.view, prepass_prog, dims);
                 }
             }
 
@@ -117,18 +119,24 @@ impl Scene {
             gl::Uniform1i(g_color_emission_handle, 3);
             gl::Uniform1i(g_color_specular_handle, 4);
 
-            let light_mat = self.light.as_matrix();
+            let light_mat = self.direction_lights[0].as_matrix();
             gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light_mat[0] as *const GLfloat);   
 
             gl::BindVertexArray(quad_vao);
 
             gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
 
-            // Only enable blending after direct lighting calcuations bc we don't want to blend with the background
+            // Only enable blending first direction light calculation bc we don't want to blend with the background
             gl::Enable(gl::BLEND);
             gl::BlendEquation(gl::FUNC_ADD);
             gl::BlendFunc(gl::ONE, gl::ONE);
             gl::DepthFunc(gl::LEQUAL);
+
+            for light in &self.direction_lights[1..] {
+                let light_mat = light.as_matrix();
+                gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light_mat[0] as *const GLfloat); 
+                gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
+            }
 
             gl::UseProgram(point_lighting_prog.0);
             let g_position_handle = gl::GetUniformLocation(point_lighting_prog.0, g_position_handle_name.as_ptr());
@@ -145,8 +153,8 @@ impl Scene {
 
             let light_handle = gl::GetUniformLocation(point_lighting_prog.0, light_handle_name.as_ptr());
 
-            for light in point_lights {
-                gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light[0] as *const GLfloat);
+            for light in &self.point_lights {
+                gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light.as_matrix()[0] as *const GLfloat);
                 gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
             }
             

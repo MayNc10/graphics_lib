@@ -6,7 +6,7 @@ use std::str;
 use crate::matrix::*;
 use super::shaders::Program;
 use super::shaders::ShaderType;
-use super::{shaders, animation::Animation, buffer::*, vao::*};
+use super::{shaders, animation::Animation, buffer::*, vao::*, lights::DirectionLight};
 
 pub mod importing;
 use importing::*;
@@ -157,26 +157,8 @@ impl Shape {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct Light {
-    pub direction: [f32; 3],
-
-    pub ambient: [f32; 3],
-    pub diffuse: [f32; 3],
-    pub specular: [f32; 3],
-} 
-
-impl Light {
-    pub fn as_matrix(&self) -> Matrix {
-        [[self.direction[0], self.direction[1], self.direction[2], 0.0], 
-        [self.ambient[0], self.ambient[1], self.ambient[2], 0.0],  
-        [self.diffuse[0], self.diffuse[1], self.diffuse[2], 0.0], 
-        [self.specular[0], self.specular[1], self.specular[2], 0.0]]
-    }
-}
-
 impl Shape {
-    pub fn draw(&self, light: &Light, view: &Mat4, program: &shaders::Program, dims: (f32, f32)) {
+    pub fn draw(&self, light: &DirectionLight, view: &Mat4, program: &shaders::Program, dims: (f32, f32)) {
         // perspective matrix        
         let perspective = {
             let (width, height) = dims;
