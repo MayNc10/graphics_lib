@@ -1,13 +1,10 @@
 use glutin::event_loop::EventLoop;
-use gl::types::*;
 use graphics_lib::three_d::buffer::FrameBuffer;
-use graphics_lib::three_d::scene::Scene;
+use graphics_lib::three_d::scene::{Scene, init_deferred_quad};
 use graphics_lib::three_d::lights::{DirectionLight, PointLight};
 use graphics_lib::three_d::shape::Shape;
 
 use std::ffi::CString;
-use std::mem;
-use std::ptr;
 
 use graphics_lib::three_d::shaders::{*, self};
 use graphics_lib::three_d;
@@ -171,29 +168,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         quadratic: 0.032,
     };
 
-
-    let mut quad_vao = 0;
-    let mut quad_vbo = 0;
-    unsafe {
-        let quad_vertices = [
-            // positions        // texture Coords
-            -1.0,  1.0, 0.0,
-            -1.0, -1.0, 0.0,
-            1.0,  1.0, 0.0, 
-            1.0, -1.0, 0.0_f32,
-        ];
-
-        // setup plane VAO
-        gl::GenVertexArrays(1, &mut quad_vao);
-        gl::GenBuffers(1, &mut quad_vbo);
-        gl::BindVertexArray(quad_vao);
-        gl::BindBuffer(gl::ARRAY_BUFFER, quad_vbo);
-        gl::BufferData(gl::ARRAY_BUFFER, mem::size_of_val(&quad_vertices) as isize, &quad_vertices[0] as *const f32 as *const GLvoid, 
-            gl::STATIC_DRAW);
-        gl::EnableVertexAttribArray(0);
-        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 3 * mem::size_of::<GLfloat>() as i32, 
-            ptr::null());
-    }
+    init_deferred_quad();
 
     let dims = gl_window.window().inner_size();
     let width = dims.width as i32;
@@ -274,7 +249,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
 
                     scene.draw_deferred(t, dims, &gl_window, 
                         prepass_program, lighting_program, point_lighting_program, 
-                        quad_vao, &frame_buffer
+                        &frame_buffer
                     );
 
                     start_time = std::time::Instant::now(); 

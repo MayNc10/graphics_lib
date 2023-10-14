@@ -37,6 +37,7 @@ impl<'a> Drop for VAOLock<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct VertexArrayObject {
     id: GLuint,
 }

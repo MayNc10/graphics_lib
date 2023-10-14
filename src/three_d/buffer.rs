@@ -9,6 +9,7 @@ pub type Vertex = [GLfloat; 3];
 
 pub type Normal = [GLfloat; 3];
 
+#[derive(Debug)]
 pub struct VertexBuffer {
     id: GLuint,
 }

@@ -4,14 +4,55 @@ use glutin::window;
 use gl::types::*;
 
 use super::buffer::FrameBuffer;
+use super::buffer::VertexBuffer;
 use super::shaders::Program;
 use super::lights::{DirectionLight, PointLight};
 use super::shape::Shape;
+use super::vao::VertexArrayObject;
 use crate::matrix::Mat4;
 
+use once_cell::sync::OnceCell;
 use std::ffi::CString;
+use std::mem;
+use std::ptr;
 
 type ObjectCollection = (Vec<Shape>, &'static Program);
+
+thread_local! {
+    static DEFERRED_QUAD_VO: OnceCell<(VertexArrayObject, VertexBuffer)> = OnceCell::new();
+}
+
+pub fn init_deferred_quad() -> bool {
+    return DEFERRED_QUAD_VO.with(|quad_vo | {
+        if quad_vo.get().is_some() {
+            return false;
+        }
+        else {
+            let quad_vertices = [
+                    // positions        // texture Coords
+                    [-1.0,  1.0, 0.0],
+                    [-1.0, -1.0, 0.0],
+                    [1.0,  1.0, 0.0], 
+                    [1.0, -1.0, 0.0_f32],
+            ];
+            let (quad_vao, vao_lock) = VertexArrayObject::new().unwrap();
+            let quad_vbo = VertexBuffer::new(&quad_vertices, &vao_lock);
+            unsafe {
+                gl::BindVertexArray(*quad_vbo.id());
+                gl::BindBuffer(gl::ARRAY_BUFFER, *quad_vao.id());
+    
+                gl::EnableVertexAttribArray(0);
+                gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 3 * mem::size_of::<GLfloat>() as i32, 
+                    ptr::null());
+            
+                gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+                gl::BindVertexArray(0);
+            }
+            quad_vo.set((quad_vao, quad_vbo)).expect("Deferred Quad was somehow already set");
+        }
+        true
+    });
+}
 
 pub struct Scene {
     objects: Vec<ObjectCollection>,
@@ -64,83 +105,87 @@ impl Scene {
     }
 
     pub fn draw_deferred(&mut self, t: f32, dims: (f32, f32), gl_window: &Window, prepass_prog: &Program, lighting_prog: &Program,
-        point_lighting_prog: &Program, quad_vao: u32, frame_buffer: &FrameBuffer) 
+        point_lighting_prog: &Program, frame_buffer: &FrameBuffer) 
     {
-        unsafe {
-            gl::UseProgram(prepass_prog.0);
-
-            frame_buffer.bind();
-            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-            gl::ClearColor(0.0, 0.0, 0.0, 0.0);
-
-            for collection in &mut self.objects {
-                for shape in &mut collection.0 {
-                    // Our prepass shader has all the same uniforms as the normal blinn-phong
-                    // And we've bound the framebuffer
-                    // So we should be good to just call 'draw'
-                    shape.animate(t);
-                    // The direction light is just a filler value, our program doesn't use it
-                    shape.draw(&self.direction_lights[0], &self.view, prepass_prog, dims);
+        DEFERRED_QUAD_VO.with(|quad_vo | { 
+            let quad = quad_vo.get().expect("Deffered Quad was not initialized");
+            let quad_vao = &quad.0;
+            unsafe {
+                gl::UseProgram(prepass_prog.0);
+    
+                frame_buffer.bind();
+                gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+                gl::ClearColor(0.0, 0.0, 0.0, 0.0);
+    
+                for collection in &mut self.objects {
+                    for shape in &mut collection.0 {
+                        // Our prepass shader has all the same uniforms as the normal blinn-phong
+                        // And we've bound the framebuffer
+                        // So we should be good to just call 'draw'
+                        shape.animate(t);
+                        // The direction light is just a filler value, our program doesn't use it
+                        shape.draw(&self.direction_lights[0], &self.view, prepass_prog, dims);
+                    }
                 }
-            }
-
-            gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
-            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-            gl::ClearColor(0.0, 0.0, 0.0, 1.0);
-
-            gl::UseProgram(lighting_prog.0);
-            frame_buffer.bind_textures();
-
-            let g_position_handle_name = CString::new("gPosition").unwrap();
-            let g_normal_handle_name = CString::new("gNormal").unwrap();
-            let g_color_diffuse_handle_name = CString::new("gColorDiffuse").unwrap();
-            let g_color_emission_handle_name = CString::new("gColorEmission").unwrap();
-            let g_color_specular_handle_name = CString::new("gColorSpecular").unwrap();
-
-            let fb_names = [g_position_handle_name, g_normal_handle_name, g_color_diffuse_handle_name, 
-                g_color_emission_handle_name, g_color_specular_handle_name];
-
-            frame_buffer.add_uniforms(&fb_names, &lighting_prog);
-
-            let light_handle_name = CString::new("light").unwrap();
-            let light_handle = gl::GetUniformLocation(lighting_prog.0, light_handle_name.as_ptr());
-            let light_mat = self.direction_lights[0].as_matrix();
-
-            gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light_mat[0] as *const GLfloat);   
-
-            gl::BindVertexArray(quad_vao);
-
-            gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
-
-            // Only enable blending first direction light calculation bc we don't want to blend with the background
-            gl::Enable(gl::BLEND);
-            gl::BlendEquation(gl::FUNC_ADD);
-            gl::BlendFunc(gl::ONE, gl::ONE);
-            gl::DepthFunc(gl::LEQUAL);
-
-            for light in &self.direction_lights[1..] {
-                let light_mat = light.as_matrix();
-                gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light_mat[0] as *const GLfloat); 
+    
+                gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+                gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+                gl::ClearColor(0.0, 0.0, 0.0, 1.0);
+    
+                gl::UseProgram(lighting_prog.0);
+                frame_buffer.bind_textures();
+    
+                let g_position_handle_name = CString::new("gPosition").unwrap();
+                let g_normal_handle_name = CString::new("gNormal").unwrap();
+                let g_color_diffuse_handle_name = CString::new("gColorDiffuse").unwrap();
+                let g_color_emission_handle_name = CString::new("gColorEmission").unwrap();
+                let g_color_specular_handle_name = CString::new("gColorSpecular").unwrap();
+    
+                let fb_names = [g_position_handle_name, g_normal_handle_name, g_color_diffuse_handle_name, 
+                    g_color_emission_handle_name, g_color_specular_handle_name];
+    
+                frame_buffer.add_uniforms(&fb_names, &lighting_prog);
+    
+                let light_handle_name = CString::new("light").unwrap();
+                let light_handle = gl::GetUniformLocation(lighting_prog.0, light_handle_name.as_ptr());
+                let light_mat = self.direction_lights[0].as_matrix();
+    
+                gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light_mat[0] as *const GLfloat);   
+    
+                gl::BindVertexArray(*quad_vao.id());
+    
                 gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
+    
+                // Only enable blending first direction light calculation bc we don't want to blend with the background
+                gl::Enable(gl::BLEND);
+                gl::BlendEquation(gl::FUNC_ADD);
+                gl::BlendFunc(gl::ONE, gl::ONE);
+                gl::DepthFunc(gl::LEQUAL);
+    
+                for light in &self.direction_lights[1..] {
+                    let light_mat = light.as_matrix();
+                    gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light_mat[0] as *const GLfloat); 
+                    gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
+                }
+    
+                gl::UseProgram(point_lighting_prog.0);
+                frame_buffer.add_uniforms(&fb_names, &point_lighting_prog);
+    
+                let light_handle = gl::GetUniformLocation(point_lighting_prog.0, light_handle_name.as_ptr());
+    
+                for light in &self.point_lights {
+                    gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light.as_matrix()[0] as *const GLfloat);
+                    gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
+                }
+                
+                gl::BindVertexArray(0);
+    
+                gl::Disable(gl::BLEND);
+                gl::DepthFunc(gl::LESS);
+    
+                gl::UseProgram(0);
             }
-
-            gl::UseProgram(point_lighting_prog.0);
-            frame_buffer.add_uniforms(&fb_names, &point_lighting_prog);
-
-            let light_handle = gl::GetUniformLocation(point_lighting_prog.0, light_handle_name.as_ptr());
-
-            for light in &self.point_lights {
-                gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light.as_matrix()[0] as *const GLfloat);
-                gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
-            }
-            
-            gl::BindVertexArray(0);
-
-            gl::Disable(gl::BLEND);
-            gl::DepthFunc(gl::LESS);
-
-            gl::UseProgram(0);
-        }
+        });
 
         gl_window.swap_buffers().unwrap();
     }
