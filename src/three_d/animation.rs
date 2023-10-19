@@ -2,7 +2,7 @@ use crate::matrix::*;
 
 use super::shape::Transform;
 
-// TODO: This should like. Just be a closure. Too complictacated imo.
+// TODO: This should like. Just be a closure. Too complicated imo.
 pub trait Animation : AnimationClone {
     fn run(&mut self, t: f32, transform: &mut Transform);
 }
@@ -90,22 +90,25 @@ impl Animation for Scaling {
 /// E.G. the 'scaling' animation scales the shape
 //#[derive(Clone)]
 pub struct Composite {
-    pub scaling: Option<Box<dyn Animation>>,
-    pub rotation: Option<Box<dyn Animation>>,
-    pub translation: Option<Box<dyn Animation>>,
+    pub scaling: Vec<Box<dyn Animation>>,
+    pub rotation: Vec<Box<dyn Animation>>,
+    pub translation: Vec<Box<dyn Animation>>,
 }
 
 impl Clone for Composite {
     fn clone(&self) -> Self {
-        let new_scaling = if let Some(b) = &self.scaling {
-            Some(b.clone_box())
-        } else { None };
-        let new_rotation = if let Some(b) = &self.rotation {
-            Some(b.clone_box())
-        } else { None };
-        let new_translation= if let Some(b) = &self.translation {
-            Some(b.clone_box())
-        } else { None };
+        let mut new_scaling= Vec::with_capacity(self.scaling.len());
+        for anim in &self.scaling {
+            new_scaling.push(anim.clone_box());
+        }
+        let mut new_rotation= Vec::with_capacity(self.rotation.len());
+        for anim in &self.rotation {
+            new_rotation.push(anim.clone_box());
+        }
+        let mut new_translation= Vec::with_capacity(self.translation.len());
+        for anim in &self.translation {
+            new_translation.push(anim.clone_box());
+        }
 
         Composite { scaling: new_scaling, rotation: new_rotation, translation: new_translation }
     }
@@ -113,14 +116,16 @@ impl Clone for Composite {
 
 impl Animation for Composite {
     fn run(&mut self, t: f32, transform: &mut Transform) {
-        if let Some(scaling) = self.scaling.as_mut() {
-            scaling.run(t, transform);
+        for anim in &mut self.scaling {
+            anim.run(t, transform);
         }
-        if let Some(rotation) = self.rotation.as_mut() {
-            rotation.run(t, transform);
+
+        for anim in &mut self.rotation {
+            anim.run(t, transform);
         }
-        if let Some(translation) = self.translation.as_mut() {
-            translation.run(t, transform);
+
+        for anim in &mut self.translation {
+            anim.run(t, transform);
         }
     }
 }
