@@ -36,5 +36,5 @@ vec3 calc_dir_light(mat4 light, vec3 normal, vec3 view_dir) {
     vec3 diffuse  = light[2].xyz * diff * texture(gColorDiffuse, TexCoords).xyz;
     vec3 specular = light[3].xyz * spec * texture(gColorSpecular, TexCoords).xyz;
     vec3 emmision = texture(gColorEmission, TexCoords).xyz;
-    return (ambient + diffuse + specular + emmision);
+    return (ambient + diffuse + specular);
 } 

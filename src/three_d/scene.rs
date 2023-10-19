@@ -105,7 +105,7 @@ impl Scene {
     }
 
     pub fn draw_deferred(&mut self, t: f32, dims: (f32, f32), gl_window: &Window, prepass_prog: &Program, lighting_prog: &Program,
-        point_lighting_prog: &Program, frame_buffer: &FrameBuffer) 
+        point_lighting_prog: &Program, emission_prog: &Program, frame_buffer: &FrameBuffer)
     {
         DEFERRED_QUAD_VO.with(|quad_vo | { 
             let quad = quad_vo.get().expect("Deffered Quad was not initialized");
@@ -143,17 +143,12 @@ impl Scene {
     
                 let fb_names = [g_position_handle_name, g_normal_handle_name, g_color_diffuse_handle_name, 
                     g_color_emission_handle_name, g_color_specular_handle_name];
-    
-                frame_buffer.add_uniforms(&fb_names, &lighting_prog);
-    
-                let light_handle_name = CString::new("light").unwrap();
-                let light_handle = gl::GetUniformLocation(lighting_prog.0, light_handle_name.as_ptr());
-                let light_mat = self.direction_lights[0].as_matrix();
-    
-                gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light_mat[0] as *const GLfloat);   
+
+                gl::UseProgram(emission_prog.0);
+                frame_buffer.add_uniforms(&fb_names, &emission_prog);
     
                 gl::BindVertexArray(*quad_vao.id());
-    
+
                 gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
     
                 // Only enable blending first direction light calculation bc we don't want to blend with the background
@@ -161,13 +156,20 @@ impl Scene {
                 gl::BlendEquation(gl::FUNC_ADD);
                 gl::BlendFunc(gl::ONE, gl::ONE);
                 gl::DepthFunc(gl::LEQUAL);
-    
-                for light in &self.direction_lights[1..] {
+
+                let light_handle_name = CString::new("light").unwrap();
+
+                gl::UseProgram(lighting_prog.0);
+                frame_buffer.add_uniforms(&fb_names, &lighting_prog);
+
+                let light_handle = gl::GetUniformLocation(lighting_prog.0, light_handle_name.as_ptr());
+
+                for light in &self.direction_lights {
                     let light_mat = light.as_matrix();
-                    gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light_mat[0] as *const GLfloat); 
+                    gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light_mat[0] as *const GLfloat);
                     gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
                 }
-    
+
                 gl::UseProgram(point_lighting_prog.0);
                 frame_buffer.add_uniforms(&fb_names, &point_lighting_prog);
     

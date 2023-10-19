@@ -82,7 +82,6 @@ pub struct Shape {
     animation: Option<Box<dyn Animation>>,
 
     shader_type: shaders::ShaderType,
-    //bface_culling: glium::draw_parameters::BackfaceCullingMode,
 
     material: Material,
 }

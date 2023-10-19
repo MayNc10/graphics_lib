@@ -112,7 +112,7 @@ pub struct FrameBuffer {
     position_id: GLuint,
     normal_id: GLuint,
     color_diffuse_id: GLuint,
-    color_emission_id: GLuint,
+    pub color_emission_id: GLuint,
     color_specular_id: GLuint,
 
     rbo_depth_id: GLuint,

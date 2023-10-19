@@ -121,7 +121,7 @@ fn demo_2d(event_loop: EventLoop<()>, display: Display) {
         } 
         
 
-        // Draw, using the vertexs, the shaders, and the matrix
+        // Draw, using the vertices, the shaders, and the matrix
         shape.draw(&mut target, &display);
         target.finish().unwrap();
     });
@@ -182,11 +182,13 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     // Create GLSL shaders
     let program = &*shaders::BLINN_PHONG;
 
-    let prepass_program = &*shaders::BLINN_PHONG_PREPASS;
+    let prepass_program = &*shaders::PREPASS;
 
     let lighting_program = &*shaders::BLINN_PHONG_LIGHTING;
 
     let point_lighting_program = &*shaders::BLINN_PHONG_POINT_LIGHTING;
+
+    let emission = &*shaders::EMISSION;
 
     let color_name = CString::new("color").unwrap();
 
@@ -266,7 +268,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
                     let dims = (dims.width as f32, dims.height as f32);  
 
                     scene.draw_deferred(t, dims, &gl_window, 
-                        prepass_program, lighting_program, point_lighting_program, 
+                        prepass_program, lighting_program, point_lighting_program, emission,
                         &frame_buffer
                     );
 
@@ -292,7 +294,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
 
                 let new_inst = start_time + std::time::Duration::from_millis(wait_millis);
                 // Wait that long
-                *control_flow =  glutin::event_loop::ControlFlow::WaitUntil(new_inst);
+                *control_flow =  ControlFlow::WaitUntil(new_inst);
                 //println!("Hitting fps goal!");
             }
         }
