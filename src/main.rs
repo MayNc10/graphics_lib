@@ -1,10 +1,12 @@
 use glutin::event_loop::EventLoop;
+use lazy_static::lazy_static;
 use graphics_lib::three_d::buffer::FrameBuffer;
 use graphics_lib::three_d::scene::{Scene, init_deferred_quad};
 use graphics_lib::three_d::lights::{DirectionLight, PointLight};
 use graphics_lib::three_d::shape::Shape;
 
 use std::ffi::CString;
+use std::path::Path;
 
 use graphics_lib::three_d::shaders::{*, self};
 use graphics_lib::three_d;
@@ -12,6 +14,9 @@ use graphics_lib::matrix::*;
 
 // Set a target for fps (don't run faster or slower than this)
 const TARGET_FPS: u64 = 60;
+lazy_static! {
+    static ref MEDIA_PATH_BASE: &'static Path = Path::new("media");
+}
 
 fn main() {
     let event_loop = glutin::event_loop::EventLoop::new();
@@ -128,11 +133,17 @@ fn demo_2d(event_loop: EventLoop<()>, display: Display) {
 }
 */
 
+fn shape_path(name: &str) -> String {
+    String::from(MEDIA_PATH_BASE.join(Path::new(name)).to_str().unwrap())
+}
+
 fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::PossiblyCurrent, glutin::window::Window>) {
     unsafe {
         gl::Enable(gl::DEPTH_TEST);
         gl::DepthFunc(gl::LESS);
     }
+
+
 
     let view = view_matrix(&[0.0, 0.0, 0.0], &[0.0, 0.0, 1.0], &[0.0, 1.0, 0.0]);
 
@@ -200,10 +211,10 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         Box::new(three_d::animation::Rotation {ty: three_d::animation::RotationType::X, angle_func}) as Box<dyn three_d::animation::Animation>;  
 
     let mut s = Shape::from_obj(
-        "media\\torus.obj", 
-        ShaderType::BlinnPhong, 
-        None, 
-        Some(rotation_animation), 
+        &shape_path("torus.obj"),
+        ShaderType::BlinnPhong,
+        None,
+        Some(rotation_animation),
         false, 
     ).unwrap();
 
@@ -218,10 +229,10 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         Box::new(three_d::animation::Rotation {ty: three_d::animation::RotationType::Z, angle_func}) as Box<dyn three_d::animation::Animation>;  
 
     let mut monkey = Shape::from_obj(
-        "media\\monkey.obj", 
-        ShaderType::BlinnPhong, 
-        None, 
-        Some(rotation_animation), 
+        &shape_path("monkey.obj"),
+        ShaderType::BlinnPhong,
+        None,
+        Some(rotation_animation),
         false, 
     ).unwrap();
 
