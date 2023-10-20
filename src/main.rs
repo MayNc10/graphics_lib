@@ -175,9 +175,6 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     let height = dims.height as i32;
 
     let frame_buffer = FrameBuffer::new(width, height);
-    
-
-    let mut scene = Scene::new(view, vec![light], vec![point_light, point_light_2]);
 
     // Create GLSL shaders
     let program = &*shaders::BLINN_PHONG;
@@ -189,6 +186,8 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     let point_lighting_program = &*shaders::BLINN_PHONG_POINT_LIGHTING;
 
     let emission = &*shaders::EMISSION;
+
+    let mut scene = Scene::new(view, program, vec![light], vec![point_light, point_light_2]);
 
     let color_name = CString::new("color").unwrap();
 
@@ -213,7 +212,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     s.set_scaling(generate_scale(&[0.33; 3]));
     s.set_translation(generate_translate(Some(-0.5), None, Some(-2.0)));
 
-    scene.add_shape(s, program); 
+    scene.add_shape(s);
 
     let rotation_animation = 
         Box::new(three_d::animation::Rotation {ty: three_d::animation::RotationType::Z, angle_func}) as Box<dyn three_d::animation::Animation>;  
@@ -231,7 +230,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     monkey.set_scaling(generate_scale(&[0.33; 3]));
     monkey.set_translation(generate_translate(Some(0.5), None, Some(-2.0)));
 
-    scene.add_shape(monkey, program); 
+    scene.add_shape(monkey);
 
     let mut t: f32 = 0.0;
     let delta: f32 = 0.02;

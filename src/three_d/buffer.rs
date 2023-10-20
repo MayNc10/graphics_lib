@@ -32,6 +32,31 @@ impl VertexBuffer {
     pub fn id(&self) -> &GLuint {
         &self.id
     }
+
+    pub fn bind_attributes(&self, program: &Program, name: &CString) {
+        unsafe {
+            let pos_attr = gl::GetAttribLocation(program.0, name.as_ptr()  as *const _);
+            self.bind_attributes_index( pos_attr);
+        }
+    }
+
+    pub fn bind_attributes_index(&self, index: GLint) {
+        unsafe {
+            gl::BindBuffer(gl::ARRAY_BUFFER, self.id);
+            // Specify the layout of the vertex data
+            gl::VertexAttribPointer(
+                index as GLuint,
+                3,
+                gl::FLOAT,
+                gl::FALSE as GLboolean,
+                0,//mem::size_of::<Vertex>() as GLint,
+                ptr::null()
+            );
+            gl::EnableVertexAttribArray(index as GLuint);
+
+            gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+        }
+    }
 }
 
 impl Drop for VertexBuffer {
@@ -63,6 +88,31 @@ impl NormalBuffer {
     }
     pub fn id(&self) -> &GLuint {
         &self.id
+    }
+
+    pub fn bind_attributes(&self, program: &Program, name: &CString) {
+        unsafe {
+            let norm_attr = gl::GetAttribLocation(program.0, name.as_ptr()  as *const _);
+            self.bind_attributes_index(norm_attr);
+        }
+    }
+
+    pub fn bind_attributes_index(&self, index: GLint) {
+        unsafe {
+            gl::BindBuffer(gl::ARRAY_BUFFER, self.id);
+            // Specify the layout of the vertex data
+            gl::VertexAttribPointer(
+                index as GLuint,
+                3,
+                gl::FLOAT,
+                gl::FALSE as GLboolean,
+                0,//mem::size_of::<Vertex>() as GLint,
+                ptr::null()
+            );
+            gl::EnableVertexAttribArray(index as GLuint);
+
+            gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+        }
     }
 }
 

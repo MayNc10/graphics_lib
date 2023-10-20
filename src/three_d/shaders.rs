@@ -65,6 +65,12 @@ impl Program {
             gl::UseProgram(0);
         }
     }
+
+    pub fn use_progam(&self) {
+        unsafe {
+            gl::UseProgram(self.0);
+        }
+    }
 }
 
 impl Drop for Program {

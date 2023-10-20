@@ -13,10 +13,6 @@ use crate::matrix::Mat4;
 
 use once_cell::sync::OnceCell;
 use std::ffi::CString;
-use std::mem;
-use std::ptr;
-
-type ObjectCollection = (Vec<Shape>, &'static Program);
 
 thread_local! {
     static DEFERRED_QUAD_VO: OnceCell<(VertexArrayObject, VertexBuffer)> = OnceCell::new();
@@ -35,19 +31,9 @@ pub fn init_deferred_quad() -> bool {
                     [1.0,  1.0, 0.0], 
                     [1.0, -1.0, 0.0_f32],
             ];
-            let (quad_vao, vao_lock) = VertexArrayObject::new().unwrap();
+            let (quad_vao, vao_lock) = VertexArrayObject::new().unwrap().into_inner();
             let quad_vbo = VertexBuffer::new(&quad_vertices, &vao_lock);
-            unsafe {
-                gl::BindVertexArray(*quad_vbo.id());
-                gl::BindBuffer(gl::ARRAY_BUFFER, *quad_vao.id());
-    
-                gl::EnableVertexAttribArray(0);
-                gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 3 * mem::size_of::<GLfloat>() as i32, 
-                    ptr::null());
-            
-                gl::BindBuffer(gl::ARRAY_BUFFER, 0);
-                gl::BindVertexArray(0);
-            }
+            quad_vbo.bind_attributes_index(0);
             quad_vo.set((quad_vao, quad_vbo)).expect("Deferred Quad was somehow already set");
         }
         true
@@ -55,32 +41,24 @@ pub fn init_deferred_quad() -> bool {
 }
 
 pub struct Scene {
-    objects: Vec<ObjectCollection>,
+    shapes: Vec<Shape>,
+    program: &'static Program,
     view: Mat4,
     direction_lights: Vec<DirectionLight>,
     point_lights: Vec<PointLight>,
 }
 
 impl Scene {
-    pub fn new(view: Mat4, direction_lights: Vec<DirectionLight>, point_lights: Vec<PointLight>) -> Scene { 
-        let objects = Vec::new();
+    pub fn new(view: Mat4, program: &'static Program, direction_lights: Vec<DirectionLight>, point_lights: Vec<PointLight>) -> Scene {
+        let shapes = Vec::new();
 
-        Scene { objects, view, direction_lights, point_lights }
+        Scene { shapes, program, view, direction_lights, point_lights }
     }
 
     /// Returns the index of the vector where the shape is stored, as well as the index in that vector
-    pub fn add_shape(&mut self, shape: Shape, program: &'static Program) -> (usize, usize) {
-        let mut i = 0; 
-        for (v, p) in &mut self.objects {
-            if *p == program {
-                v.push(shape);
-                return (i, v.len() - 1);
-            }
-            i += 1;
-        } 
-        let v = Vec::from([shape]);
-        self.objects.push((v, program));
-        return (i, 0);
+    pub fn add_shape(&mut self, shape: Shape) -> usize {
+        self.shapes.push(shape);
+        self.shapes.len() - 1
     }
 }
 
@@ -94,12 +72,11 @@ impl Scene {
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
 
-        for object_collection in &mut self.objects {
-            for shape in &mut object_collection.0 {
-                shape.animate(t);
-                shape.draw(&self.direction_lights[0], &self.view, &object_collection.1, dims); 
-            }
+        for shape in &mut self.shapes {
+            shape.animate(t);
+            shape.draw(&self.direction_lights[0], &self.view, self.program, dims);
         }
+
 
         gl_window.swap_buffers().unwrap();
     }
@@ -111,28 +88,26 @@ impl Scene {
             let quad = quad_vo.get().expect("Deffered Quad was not initialized");
             let quad_vao = &quad.0;
             unsafe {
-                gl::UseProgram(prepass_prog.0);
+                prepass_prog.use_progam();
     
                 frame_buffer.bind();
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
                 gl::ClearColor(0.0, 0.0, 0.0, 0.0);
-    
-                for collection in &mut self.objects {
-                    for shape in &mut collection.0 {
-                        // Our prepass shader has all the same uniforms as the normal blinn-phong
-                        // And we've bound the framebuffer
-                        // So we should be good to just call 'draw'
-                        shape.animate(t);
-                        // The direction light is just a filler value, our program doesn't use it
-                        shape.draw(&self.direction_lights[0], &self.view, prepass_prog, dims);
-                    }
+
+                for shape in &mut self.shapes {
+                    // Our prepass shader has all the same uniforms as the normal blinn-phong
+                    // And we've bound the framebuffer
+                    // So we should be good to just call 'draw'
+                    shape.animate(t);
+                    // The direction light is just a filler value, our program doesn't use it
+                    shape.draw(&self.direction_lights[0], &self.view, prepass_prog, dims);
                 }
-    
+
                 gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
                 gl::ClearColor(0.0, 0.0, 0.0, 1.0);
-    
-                gl::UseProgram(lighting_prog.0);
+
+                lighting_prog.use_progam();
                 frame_buffer.bind_textures();
     
                 let g_position_handle_name = CString::new("gPosition").unwrap();
@@ -144,10 +119,10 @@ impl Scene {
                 let fb_names = [g_position_handle_name, g_normal_handle_name, g_color_diffuse_handle_name, 
                     g_color_emission_handle_name, g_color_specular_handle_name];
 
-                gl::UseProgram(emission_prog.0);
+                emission_prog.use_progam();
                 frame_buffer.add_uniforms(&fb_names, &emission_prog);
     
-                gl::BindVertexArray(*quad_vao.id());
+                let _vao_lock = quad_vao.bind().unwrap();
 
                 gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
     
@@ -159,18 +134,17 @@ impl Scene {
 
                 let light_handle_name = CString::new("light").unwrap();
 
-                gl::UseProgram(lighting_prog.0);
+                lighting_prog.use_progam();
                 frame_buffer.add_uniforms(&fb_names, &lighting_prog);
 
                 let light_handle = gl::GetUniformLocation(lighting_prog.0, light_handle_name.as_ptr());
 
                 for light in &self.direction_lights {
-                    let light_mat = light.as_matrix();
-                    gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light_mat[0] as *const GLfloat);
+                    gl::UniformMatrix4fv(light_handle, 1, gl::FALSE, &light.as_matrix()[0] as *const GLfloat);
                     gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
                 }
 
-                gl::UseProgram(point_lighting_prog.0);
+                point_lighting_prog.use_progam();
                 frame_buffer.add_uniforms(&fb_names, &point_lighting_prog);
     
                 let light_handle = gl::GetUniformLocation(point_lighting_prog.0, light_handle_name.as_ptr());

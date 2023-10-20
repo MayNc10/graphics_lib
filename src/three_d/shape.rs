@@ -1,12 +1,11 @@
 use gl::types::*;
 use std::ffi::CString;
 use std::ptr;
-use std::str;
 
 use crate::matrix::*;
 use super::shaders::Program;
 use super::shaders::ShaderType;
-use super::{shaders, animation::Animation, buffer::*, vao::*, lights::DirectionLight};
+use super::{animation::Animation, buffer::*, vao::*, lights::DirectionLight};
 
 pub mod importing;
 use importing::*;
@@ -81,46 +80,20 @@ pub struct Shape {
     transform: Transform,
     animation: Option<Box<dyn Animation>>,
 
-    shader_type: shaders::ShaderType,
+    shader_type: ShaderType,
 
     material: Material,
 }
 
 impl Shape {
     pub fn bind_attributes(&self, program: &Program) {
-        unsafe {
-            gl::BindVertexArray(*self.vao.id());
+        let _vao_lock = self.vao.bind().unwrap().into_inner();
 
-            gl::BindBuffer(gl::ARRAY_BUFFER, *self.positions.id());
-            // Specify the layout of the vertex data
-            let pos_name = CString::new("position").unwrap();
-            let pos_attr = gl::GetAttribLocation(program.0, pos_name.as_ptr());
-            gl::VertexAttribPointer(
-                pos_attr as GLuint,
-                3,
-                gl::FLOAT,
-                gl::FALSE as GLboolean,
-                0,//mem::size_of::<Vertex>() as GLint,
-                ptr::null()
-            );
-            gl::EnableVertexAttribArray(pos_attr as GLuint);
+        let pos_name = CString::new("position").unwrap();
+        let norm_name = CString::new("normal").unwrap();
 
-            gl::BindBuffer(gl::ARRAY_BUFFER, *self.normals.id());
-            // Specify the layout of the vertex data
-            let norm_name = CString::new("normal").unwrap();
-            let norm_attr = gl::GetAttribLocation(program.0, norm_name.as_ptr());
-            gl::VertexAttribPointer(
-                norm_attr as GLuint,
-                3,
-                gl::FLOAT,
-                gl::TRUE as GLboolean,
-                0,//mem::size_of::<Normal>() as GLint,
-                ptr::null()
-            );
-            gl::EnableVertexAttribArray(norm_attr as GLuint);
-
-            gl::BindVertexArray(0);
-        }
+        self.positions.bind_attributes(program, &pos_name);
+        self.normals.bind_attributes(program, &norm_name);
     }
 }
 
@@ -157,11 +130,11 @@ impl Shape {
 }
 
 impl Shape {
-    pub fn draw(&self, light: &DirectionLight, view: &Mat4, program: &shaders::Program, dims: (f32, f32)) {
+    pub fn draw(&self, light: &DirectionLight, view: &Mat4, program: &Program, dims: (f32, f32)) {
         // perspective matrix        
         let perspective = {
             let (width, height) = dims;
-            let aspect_ratio = height as f32 / width as f32;
+            let aspect_ratio = height / width;
 
             let f = 1.0 / (FOV / 2.0).tan();
 
@@ -175,7 +148,7 @@ impl Shape {
             
         };
         unsafe {
-            gl::BindVertexArray(*self.vao.id());
+            let _vao_lock = self.vao.bind().unwrap();
             let perspective_name = CString::new("perspective").unwrap();
             let view_name = CString::new("view").unwrap();
             let model_name = CString::new("model").unwrap();
