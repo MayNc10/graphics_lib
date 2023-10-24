@@ -1,3 +1,8 @@
+//! Wrapper structs around OpenGL Buffers.
+//!
+//! This module provides wrappers around Vertex and Normal buffers (VBOs),
+//! Index buffers (EBOs), and Frame buffers.
+
 use gl::types::*;
 use std::ffi::CString;
 use std::mem;
@@ -5,16 +10,22 @@ use std::ptr;
 use super::shaders::Program;
 use super::vao::VAOLock;
 
+/// A type alias for a vertex, or a point in 3D space.
 pub type Vertex = [GLfloat; 3];
 
+/// A type alias for a normal, or a three-dimensional vector
 pub type Normal = [GLfloat; 3];
 
+/// A wrapper struct around a vertex buffer (VBO).
 #[derive(Debug)]
 pub struct VertexBuffer {
     id: GLuint,
 }
 
 impl VertexBuffer {
+    /// Create a new vertex buffer out of a list of vertices.
+    ///
+    /// The VAOLock is required to ensure that a VertexArrayObject has been bound in the current scope before calling this function.
     pub fn new(data: &[Vertex], _vao_lock: &VAOLock) -> VertexBuffer {
         let mut id = 0;
         unsafe {
@@ -29,10 +40,16 @@ impl VertexBuffer {
         }
         VertexBuffer { id }
     }
+    /// Access the OpenGL id of this buffer.
+    ///
+    /// This function will eventually be deprecated.
     pub fn id(&self) -> &GLuint {
         &self.id
     }
 
+    /// Bind the attributes of this buffer to a specific program.
+    ///
+    /// The 'name' argument should correspond to the name of the input variable that the program uses to take in a vertex position.
     pub fn bind_attributes(&self, program: &Program, name: &CString) {
         unsafe {
             let pos_attr = gl::GetAttribLocation(program.0, name.as_ptr()  as *const _);
@@ -40,6 +57,7 @@ impl VertexBuffer {
         }
     }
 
+    /// Bind the attributes of this buffer to a specific program, given the index in the program of the position input variable.
     pub fn bind_attributes_index(&self, index: GLint) {
         unsafe {
             gl::BindBuffer(gl::ARRAY_BUFFER, self.id);
@@ -67,11 +85,15 @@ impl Drop for VertexBuffer {
     }
 }
 
+/// A wrapper struct around a normal buffer (VBO).
 pub struct NormalBuffer {
     id: GLuint,
 }
 
 impl NormalBuffer {
+    /// Create a new normal buffer out of a list of normals.
+    ///
+    /// The VAOLock is required to ensure that a VertexArrayObject has been bound in the current scope before calling this function.
     pub fn new(data: &[Normal], _vao_lock: &VAOLock) -> NormalBuffer {
         let mut id = 0;
         unsafe {
@@ -86,10 +108,17 @@ impl NormalBuffer {
         }
         NormalBuffer { id }
     }
+
+    /// Access the OpenGL id of this buffer.
+    ///
+    /// This function will eventually be deprecated.
     pub fn id(&self) -> &GLuint {
         &self.id
     }
 
+    /// Bind the attributes of this buffer to a specific program.
+    ///
+    /// The 'name' argument should correspond to the name of the input variable that the program uses to take in a vertex normal
     pub fn bind_attributes(&self, program: &Program, name: &CString) {
         unsafe {
             let norm_attr = gl::GetAttribLocation(program.0, name.as_ptr()  as *const _);
@@ -97,6 +126,7 @@ impl NormalBuffer {
         }
     }
 
+    /// Bind the attributes of this buffer to a specific program, given the index in the program of the position input variable.
     pub fn bind_attributes_index(&self, index: GLint) {
         unsafe {
             gl::BindBuffer(gl::ARRAY_BUFFER, self.id);
@@ -124,12 +154,17 @@ impl Drop for NormalBuffer {
     }
 }
 
+/// A wrapper about an index buffer (EBO).
 pub struct IndexBuffer {
     id: GLuint,
+    /// The number of indices in this buffer.
     pub num_indices: usize,
 }
 
 impl IndexBuffer {
+    /// Create a new vertex buffer out of a list of indices.
+    ///
+    /// The VAOLock is required to ensure that a VertexArrayObject has been bound in the current scope before calling this function.
     pub fn new(data: &[GLuint], _vao_lock: &VAOLock) -> IndexBuffer {
         let mut id = 0;
         unsafe {
@@ -144,6 +179,10 @@ impl IndexBuffer {
         }
         IndexBuffer { id, num_indices: data.len() }
     }
+
+    /// Access the OpenGL id of this buffer.
+    ///
+    /// This function will eventually be deprecated.
     pub fn get_id(&self) -> &GLuint {
         &self.id
     }
@@ -157,11 +196,14 @@ impl Drop for IndexBuffer {
     }
 }
 
+/// A wrapper around a frame buffer and its associated textures.
 pub struct FrameBuffer {
     buffer_id: GLuint,
     position_id: GLuint,
     normal_id: GLuint,
     color_diffuse_id: GLuint,
+    // FIXME: This shouldn't be public
+    /// FIXME: This shouldn't be public
     pub color_emission_id: GLuint,
     color_specular_id: GLuint,
 
@@ -169,6 +211,7 @@ pub struct FrameBuffer {
 }
 
 impl FrameBuffer {
+    /// Creates a new frame buffer, given the dimensions of the screen.
     pub fn new(width: i32, height: i32) -> FrameBuffer {
         let mut buffer_id = 0;
         let mut position_id = 0;
@@ -246,6 +289,7 @@ impl FrameBuffer {
         FrameBuffer { buffer_id, position_id, normal_id, color_diffuse_id, color_emission_id, color_specular_id, rbo_depth_id}
     }
 
+    /// Binds the associated textures.
     pub fn bind_textures(&self) {
         unsafe {
             gl::ActiveTexture(gl::TEXTURE0);
@@ -261,12 +305,14 @@ impl FrameBuffer {
         }
     }
 
+    /// Binds the frame buffer.
     pub fn bind(&self) {
         unsafe {
             gl::BindFramebuffer(gl::FRAMEBUFFER, self.buffer_id);
         }
     }
 
+    /// Binds the texture uniforms, given the associated names and the program to bind to.
     pub fn add_uniforms(&self, names: &[CString; 5], program: &Program) {
         unsafe {
 

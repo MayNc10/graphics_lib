@@ -185,7 +185,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     let width = dims.width as i32;
     let height = dims.height as i32;
 
-    let frame_buffer = FrameBuffer::new(width, height);
+    let mut frame_buffer = FrameBuffer::new(width, height);
 
     // Create GLSL shaders
     let program = &*shaders::BLINN_PHONG;
@@ -247,6 +247,8 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     let delta: f32 = 0.02;
 
     let mut start_time = std::time::Instant::now();
+    let mut dims_ps = gl_window.window().inner_size();
+    let mut dims = (dims_ps.width as f32, dims_ps.height as f32);
 
     event_loop.run(move |event, _, control_flow| {
         
@@ -274,8 +276,11 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
                     // Update time
                     t += delta;
 
-                    let dims = gl_window.window().inner_size();
-                    let dims = (dims.width as f32, dims.height as f32);  
+                    if dims_ps != gl_window.window().inner_size() {
+                        dims_ps = gl_window.window().inner_size();
+                        dims = (dims_ps.width as f32, dims_ps.height as f32);
+                        frame_buffer = FrameBuffer::new(dims.0 as i32, dims.0 as i32);
+                    }
 
                     scene.draw_deferred(t, dims, &gl_window, 
                         prepass_program, lighting_program, point_lighting_program, emission,

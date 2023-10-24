@@ -1,3 +1,5 @@
+//! This module provides a wrapper around an OpenGL VertexArrayObject
+
 use gl::types::*;
 use std::sync::{Mutex, MutexGuard};
 use lazy_static::lazy_static;
@@ -15,12 +17,9 @@ unsafe fn unbind_buffers() {
     }
 }
 
-/// This represents a theoretical lock on the VAO
-/// The VAO needs a lock because each VAO corresponds to a specific VBO and EBO
-/// For our code to be correct, we have to create the VAO, then create our VBO and EBO, then unbind everything
-/// Therefore, we shouldn't have two VAOs at the same time
-/// This represents this idea 
-/// It's also nice because it'll automatically drop at the end of scope, and then it'll unbind everything
+/// This represents a theoretical lock on the VAO.
+/// Some OpenGL functions don't make sense to be called unless a VAO has been bound.
+/// This object is created when a VAO is bound, and is a required argument for those functions.
 pub struct VAOLock<'a> {
     _guard: MutexGuard<'a, ()>,
 }
@@ -32,12 +31,16 @@ impl VAOLock<'_> {
     }
 }
 
+/// When we drop a VAOLock, we unbind the vertex buffers
 impl<'a> Drop for VAOLock<'a> {
     fn drop(&mut self) {
         unsafe { unbind_buffers(); }
     }
 }
 
+/// A VertexArrayObject represents an OpenGL VAO.
+///
+/// This holds information about the vertices of a shape.
 #[derive(Debug)]
 pub struct VertexArrayObject {
     id: GLuint,
@@ -45,6 +48,12 @@ pub struct VertexArrayObject {
 }
 
 impl VertexArrayObject {
+    /// Create a new VertexArrayObject.
+    ///
+    /// This method will return `None` if a VertexArrayObject already exists in the current scope.
+    /// This method returns the VertexArrayObject, and also returns a VAOLock.
+    /// Other methods in this library require a VAOLock to be called.
+    /// This ensures that a VAO has been created or bound before other methods are called.
     pub fn new() -> Option<MustUse<(VertexArrayObject, VAOLock<'static>)>> {
         // Check to make sure we haven't acquired the global VAO lock yet
         let guard = VAO_LOCK.lock();
@@ -58,6 +67,9 @@ impl VertexArrayObject {
         } else { None }
     }
 
+    /// This method binds an already-existing VAO and gives back a VAOLock
+    ///
+    /// Just like `VertexArrayObject::new()`, this method will fail if a VAO has already been bound
     pub fn bind(&self) -> Option<MustUse<VAOLock<'static>>> {
         let guard = VAO_LOCK.lock();
         if let Ok(vao_lock) = guard {

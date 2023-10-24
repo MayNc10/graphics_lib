@@ -1,13 +1,18 @@
+//! A 4x4 matrix implementation, with functions for matrix multiplication.
 use std::ops::{Mul, MulAssign};
 
+/// Define a matrix to be a 4x4 matrix of floating-point numbers.
 pub type Matrix = [[f32; 4]; 4];
 
+/// A wrapper struct around a Matrix.
 #[derive(Clone, Copy)]
 pub struct Mat4 {
+    /// The inner Matrix value.
     pub inner: Matrix,
 }
 
 impl Mat4 {
+    /// Create a new wrapper from a Matrix.
     pub fn new(m: Matrix) -> Mat4 {
         Mat4 { inner: m }
     }
@@ -46,7 +51,7 @@ impl MulAssign for Mat4 {
     }
 }
 
-// Define an identity matrix
+/// Define the identity matrix.
 pub const IDENTITY: Mat4 = Mat4 { inner: [
     [1.0, 0.0, 0.0, 0.0], 
     [0.0, 1.0, 0.0, 0.0], 
@@ -54,6 +59,7 @@ pub const IDENTITY: Mat4 = Mat4 { inner: [
     [0.0, 0.0, 0.0, 1.0f32],
 ]}; 
 
+/// Generate a scaling matrix.
 pub fn generate_scale(scaling: &[f32; 3]) -> Mat4 {
     Mat4 { inner: [
         [scaling[0], 0.0, 0.0, 0.0], 
@@ -63,6 +69,7 @@ pub fn generate_scale(scaling: &[f32; 3]) -> Mat4 {
     ]}
 }
 
+/// Generates a rotation matrix around the x-axis, given an angle in radians.
 pub fn generate_rotate_x(angle: f32) -> Mat4 {
     Mat4 { inner: [
         [1.0, 0.0, 0.0, 0.0], 
@@ -72,6 +79,7 @@ pub fn generate_rotate_x(angle: f32) -> Mat4 {
     ]}
 }
 
+/// Generates a rotation matrix around the y-axis, given an angle in radians.
 pub fn generate_rotate_y(angle: f32) -> Mat4 {
     Mat4 { inner: [
         [angle.cos(), 0.0, angle.sin(), 0.0], 
@@ -81,6 +89,7 @@ pub fn generate_rotate_y(angle: f32) -> Mat4 {
     ]}
 }
 
+/// Generates a rotation matrix around the z-axis, given an angle in radians.
 pub fn generate_rotate_z(angle: f32) -> Mat4 {
     Mat4 { inner: [
         [angle.cos(), angle.sin(), 0.0, 0.0], 
@@ -90,6 +99,9 @@ pub fn generate_rotate_z(angle: f32) -> Mat4 {
     ]}
 }
 
+/// Generates a translation matrix given offsets in along all three axes.
+///
+/// If `None` is provided as an offset, the matrix shifts by 0 along that axis.
 pub fn generate_translate(x_offset: Option<f32>, y_offset: Option<f32>, z_offset: Option<f32>) -> Mat4 {
     Mat4 { inner: [
         [1.0, 0.0, 0.0, 0.0], 
@@ -99,7 +111,7 @@ pub fn generate_translate(x_offset: Option<f32>, y_offset: Option<f32>, z_offset
     ]}
 }
 
-
+/// Create a view matrix given the camera's position, the camera's view direction, and the direction that the camera would see as "up"
 pub fn view_matrix(position: &[f32; 3], direction: &[f32; 3], up: &[f32; 3]) -> Mat4 {
     let f = {
         let f = direction;

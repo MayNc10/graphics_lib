@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["DirectionLight","A light that points in a specified direction."],["PointLight","A light that emanates from a specific point."]]};

@@ -1,3 +1,4 @@
+//! A shape with given vertex coordinates and normal vectors.
 use gl::types::*;
 use std::ffi::CString;
 use std::ptr;
@@ -10,21 +11,31 @@ use super::{animation::Animation, buffer::*, vao::*, lights::DirectionLight};
 pub mod importing;
 use importing::*;
 
+/// Defines the camera FOV.
 pub const FOV: f32 = std::f32::consts::PI / 3.0;
+/// Defines the far plane of the camera.
 pub const ZFAR: f32 = -1024.0;
+/// Defines the near plane of the camera.
 pub const ZNEAR: f32 = -0.1;
 
 //const EPSILON: f32 = 1e-3;
 
+/// Represents a transformation, made up of a rotation matrix, a scaling matrix, and a translation matrix
+/// FIXME: Should account for multiple of each type of matrix.
 #[derive(Clone, Copy)]
 pub struct Transform {
+    /// The full transformation matrix of this 3D transform.
     pub transform_matrix: Mat4,
+    /// The rotation matrix for the transform.
     pub rotation_matrix: Mat4,
+    /// The scaling matrix for the transform.
     pub scaling_matrix: Mat4,
+    /// The translation matrix for the transform.
     pub translation_matrix: Mat4,
 }
 
 impl Transform {
+    /// Set the transform matrix.
     pub fn set_transform_matrix(&mut self, scaling: Option<Mat4>, rotation: Option<Mat4>, translation: Option<Mat4> ) {
         if rotation.is_some() {
             self.rotation_matrix = rotation.unwrap();
@@ -39,18 +50,21 @@ impl Transform {
         self.transform_matrix = self.scaling_matrix * self.rotation_matrix * self.translation_matrix;
     }
 
+    /// Set the scaling matrix.
     pub fn set_scaling(&mut self, scaling: Mat4) {
         self.scaling_matrix = scaling;
 
         self.transform_matrix = self.scaling_matrix * self.rotation_matrix * self.translation_matrix;
     }
 
+    /// Set the rotation matrix.
     pub fn set_rotation(&mut self, rotation: Mat4) {
         self.rotation_matrix = rotation;
 
         self.transform_matrix = self.scaling_matrix * self.rotation_matrix * self.translation_matrix;
     }
 
+    /// Set the translation matrix.
     pub fn set_translation(&mut self, translation: Mat4) {
         self.translation_matrix = translation;
 
@@ -70,6 +84,7 @@ impl Default for Transform {
     }
 }
 
+/// A shape with given vertex coordinates and normal vectors.
 pub struct Shape {
     vao: VertexArrayObject,
 
@@ -86,6 +101,7 @@ pub struct Shape {
 }
 
 impl Shape {
+    /// Bind the position and normal attributes of this shape to the given program.
     pub fn bind_attributes(&self, program: &Program) {
         let _vao_lock = self.vao.bind().unwrap().into_inner();
 
@@ -98,38 +114,46 @@ impl Shape {
 }
 
 impl Shape {
+    /// Run one step of animation, which updates the shape's 3D transformation based on the shape's animation.
     pub fn animate(&mut self, t: f32) {
         if let Some(animation) = self.animation.as_mut() {
             animation.run(t, &mut self.transform);
         }
     }
+    /// Swap out the current animation for a different one.
     pub fn replace_animation(&mut self, animation: Box<dyn Animation>) {
         self.animation = Some(animation);
     }
+    /// Sets the shape's material.
     pub fn set_material(&mut self, mat: Material) {
         self.material = mat;
     }
 }
 
 impl Shape {
+    /// Sets the shape's transformation matrix.
     pub fn set_transform_matrix(&mut self, scaling: Option<Mat4>, rotation: Option<Mat4>, translation: Option<Mat4> ) {
         self.transform.set_transform_matrix(scaling, rotation, translation);
     }
 
+    /// Sets the shape's scaling matrix.
     pub fn set_scaling(&mut self, scaling: Mat4) {
         self.transform.set_scaling(scaling)
     }
 
+    /// Sets the shape's rotation matrix.
     pub fn set_rotation(&mut self, rotation: Mat4) {
         self.transform.set_rotation(rotation)
     }
 
+    /// Sets the shape's translation matrix.
     pub fn set_translation(&mut self, translation: Mat4) {
         self.transform.set_translation(translation)
     }
 }
 
 impl Shape {
+    /// Draws the shape to the set framebuffer, given the light source, the view matrix, the program to use, and the screen dimensions.
     pub fn draw(&self, light: &DirectionLight, view: &Mat4, program: &Program, dims: (f32, f32)) {
         // perspective matrix        
         let perspective = {

@@ -1,3 +1,5 @@
+//! A Scene represents a set of lights, shapes, and a specific rendering program.
+
 use glutin::ContextWrapper;
 use glutin::PossiblyCurrent;
 use glutin::window;
@@ -18,6 +20,7 @@ thread_local! {
     static DEFERRED_QUAD_VO: OnceCell<(VertexArrayObject, VertexBuffer)> = OnceCell::new();
 }
 
+/// If using deferred rendering, this function must be called before rendering.
 pub fn init_deferred_quad() -> bool {
     return DEFERRED_QUAD_VO.with(|quad_vo | {
         if quad_vo.get().is_some() {
@@ -40,6 +43,7 @@ pub fn init_deferred_quad() -> bool {
     });
 }
 
+/// A Scene represents a set of lights, shapes, and a specific rendering program.
 pub struct Scene {
     shapes: Vec<Shape>,
     program: &'static Program,
@@ -49,13 +53,15 @@ pub struct Scene {
 }
 
 impl Scene {
+    /// Create a new scene given a view matrix, a program to use, a set of direction lights, and a set of point lights.
     pub fn new(view: Mat4, program: &'static Program, direction_lights: Vec<DirectionLight>, point_lights: Vec<PointLight>) -> Scene {
         let shapes = Vec::new();
 
         Scene { shapes, program, view, direction_lights, point_lights }
     }
 
-    /// Returns the index of the vector where the shape is stored, as well as the index in that vector
+    /// Returns the index of the shape vector where the shape is stored.
+    // FIXME: Make this actually usable
     pub fn add_shape(&mut self, shape: Shape) -> usize {
         self.shapes.push(shape);
         self.shapes.len() - 1
@@ -65,6 +71,9 @@ impl Scene {
 type Window = ContextWrapper<PossiblyCurrent, window::Window>;
 
 impl Scene {
+    /// Render the scene to the screen, given the window, the window dimensions, and the current time.
+    ///
+    /// Note: This function only applied the first direction light and no point lights.
     pub fn draw(&mut self, t: f32, dims: (f32, f32), gl_window: &Window) {
         unsafe {
             // Clear the screen to black
@@ -81,6 +90,10 @@ impl Scene {
         gl_window.swap_buffers().unwrap();
     }
 
+    /// Draw using deferred rendering.
+    /// Deferred rendering allows for the use of an arbitrary number of lights.
+    ///
+    /// The `prepass_prog` 
     pub fn draw_deferred(&mut self, t: f32, dims: (f32, f32), gl_window: &Window, prepass_prog: &Program, lighting_prog: &Program,
         point_lighting_prog: &Program, emission_prog: &Program, frame_buffer: &FrameBuffer)
     {

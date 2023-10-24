@@ -1,7 +1,10 @@
+//! Methods for loading a shape from modeling files.
 use std::{fs, collections::HashMap, path::Path};
 
 use super::*;
 
+// FIXME: Remove this!
+/// FIXME: Remove this!
 pub const MAT: Material = Material {
     ambient_color: [0.2, 0.0, 0.0],
     diffuse_color: [0.6, 0.0, 0.0],
@@ -14,13 +17,24 @@ pub const MAT: Material = Material {
     illum_model: None,
 };
 
+/// An enum represents errors that can happen in the importing process.
 #[derive(Debug)]
 pub enum ImportError {
+    /// An error returned if the file doesn't have an extension compatible with the import method used.
     IncorrectExtension,
+    /// An error returned by the file system.
     FileError(Box<dyn std::error::Error>),
+    /// Our importing functions currently assumed the models have been triangulated. If they haven't, this error is returned.
     UnexpectedPolygon,
 }
 impl Shape {
+    /// Loads the shape from the given obj file.
+    ///
+    /// Even if the obj file defines objects or vertex groups, it will all be imported as one shape.
+    /// This is because there is no good way to find the origins of the objects/groups, so transformations of those shapes would be incorrect.
+    /// Additionally, there are good reasons why a modeler would want multiple objects to be packed into the same shape.
+    /// If you want to load two different shapes, split the shapes across files.
+    // FIXME: Use different materials for the different objects/vertex groups in the file
     pub fn from_obj(
         path: &str,
         shader_type: ShaderType,
@@ -193,33 +207,60 @@ impl Shape {
 
 #[derive(Clone, Copy, Debug)]
 // This could be done better as multiple settings instead of one list
+/// These are all the illumination models of the OBJ file format.
+/// An illumination model roughly defines what type of rendering program should be used to render the object.
+///
+/// They are currently not used by the program.
+// FIXME: Document these variants.
 pub enum IlluminationModel {
+    #[doc(hidden)]
     COnAmOff,
+    #[doc(hidden)]
     COnAmOn,
+    #[doc(hidden)]
     HighOn,
+    #[doc(hidden)]
     ReOnRTOn,
+    #[doc(hidden)]
     TransGlassOnReRTOn,
+    #[doc(hidden)]
     ReFresOnRTOn,
+    #[doc(hidden)]
     TransRefracOnReFresOffRtOn,
+    #[doc(hidden)]
     TransRefracOnReFresOnRtOn,
+    #[doc(hidden)]
     ReOnRTOff,
+    #[doc(hidden)]
     TransGlassOnReRTOff,
+    #[doc(hidden)]
     InvisShadow,
 }
 
+/// This struct represents an MTL material/
 #[derive(Clone, Copy, Debug)]
 pub struct Material {
+    /// The ambient color of the object.
     pub ambient_color: [f32; 3],
+    /// The diffuse color of the object.
     pub diffuse_color: [f32; 3],
+    /// The emission color of the object.
     pub emission_color: [f32; 3],
+    /// The specular color of the object.
     pub specular_color: [f32; 3],
+    /// The specular exponent of the object.
     pub specular_exp: f32,
+    /// The transparency of the object.
     pub transparency: f32,
+    /// The transmission color filter of the object.
     pub transmission_filter_color: Option<[f32; 3]>,
+    /// The optical density of the object.
     pub optical_density: Option<f32>,
+    /// The illumination model of the object.
     pub illum_model: Option<IlluminationModel>,
 }
 
+/// If an object has no specified specular exponent, this value is used.
 pub const DEFAULT_SPEC_EXP: f32 = 16.0;
 
 impl Default for Material {
@@ -231,6 +272,7 @@ impl Default for Material {
 }
 
 impl Material {
+    /// Load a material from an MTL file.
     pub fn from_mtl(path: &str) -> Result<HashMap<String, Material>, ImportError> {
         let bytes = fs::read(path);
         if let Err(err) = bytes {

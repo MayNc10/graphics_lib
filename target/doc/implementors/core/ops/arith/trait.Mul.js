@@ -1,0 +1,3 @@
+(function() {var implementors = {
+"graphics_lib":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/ops/arith/trait.Mul.html\" title=\"trait core::ops::arith::Mul\">Mul</a>&lt;<a class=\"struct\" href=\"graphics_lib/matrix/struct.Mat4.html\" title=\"struct graphics_lib::matrix::Mat4\">Mat4</a>&gt; for <a class=\"struct\" href=\"graphics_lib/matrix/struct.Mat4.html\" title=\"struct graphics_lib::matrix::Mat4\">Mat4</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
