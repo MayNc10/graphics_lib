@@ -13,4 +13,5 @@ pub mod shaders;
 pub mod shape;
 pub mod vao;
 pub mod lights;
+pub mod raytracing;
 //pub mod teapot;

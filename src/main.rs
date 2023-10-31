@@ -7,13 +7,15 @@ use graphics_lib::three_d::shape::Shape;
 
 use std::ffi::CString;
 use std::path::Path;
+use std::ptr;
 
 use graphics_lib::three_d::shaders::{*, self};
 use graphics_lib::three_d;
 use graphics_lib::matrix::*;
+use three_d::raytracing;
 
 // Set a target for fps (don't run faster or slower than this)
-const TARGET_FPS: u64 = 60;
+const TARGET_FPS: u64 = 10;
 lazy_static! {
     static ref MEDIA_PATH_BASE: &'static Path = Path::new("media");
 }
@@ -32,7 +34,8 @@ fn main() {
     // Load the OpenGL function pointers
     gl::load_with(|symbol| gl_window.get_proc_address(symbol));
 
-    demo_3d(event_loop, gl_window);
+    //demo_3d(event_loop, gl_window);
+    demo_rt(event_loop, gl_window);
 }
 
 /* 
@@ -132,6 +135,108 @@ fn demo_2d(event_loop: EventLoop<()>, display: Display) {
     });
 }
 */
+
+fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::PossiblyCurrent, glutin::window::Window>) {
+    unsafe {
+        //gl::Enable(gl::DEPTH_TEST);
+        gl::Enable( gl::DEBUG_OUTPUT );
+        //gl::DepthFunc(gl::LESS);
+    }
+
+    let mut dims_ps = gl_window.window().inner_size();
+    let mut dims = (dims_ps.width as i32, dims_ps.height as i32);
+
+    let mut fb = 0;
+    let mut tex = 0;
+
+    unsafe {
+        gl::GenFramebuffers(1, &mut fb);
+        gl::BindFramebuffer(gl::FRAMEBUFFER, fb);
+
+        // - position color buffer
+        gl::GenTextures(1, &mut tex);
+        gl::BindTexture(gl::TEXTURE_2D, tex);
+
+        gl::TexStorage2D(gl::TEXTURE_2D, 1, gl::RGBA32F, raytracing::image_width as i32, raytracing::image_height);
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+        gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::TEXTURE_2D, tex, 0);
+
+        gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+    }
+
+    let mut t: f32 = 0.0;
+    let delta: f32 = 0.02;
+
+    let mut start_time = std::time::Instant::now();
+
+    let mut data = vec![0.0_f32; raytracing::image_width as usize * raytracing::image_height as usize * 4].into_boxed_slice();
+    event_loop.run(move |event, _, control_flow| {
+
+        use glutin::event::{Event, WindowEvent};
+        use glutin::event_loop::ControlFlow;
+        *control_flow = ControlFlow::Wait;
+        match event {
+            Event::LoopDestroyed => return,
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::CloseRequested => {
+                    *control_flow = ControlFlow::Exit
+                },
+                _ => (),
+            },
+            Event::RedrawRequested(_) => {
+                let elapsed_time = std::time::Instant::now().duration_since(start_time).as_millis() as u64;
+
+                // How long should we wait for to run at 60 fps?
+                let wait_millis = match 1000 / TARGET_FPS >= elapsed_time {
+                    true => 1000 / TARGET_FPS - elapsed_time,
+                    false => 0
+                };
+
+                if wait_millis == 0 {
+                    // Update time
+                    t += delta;
+                    println!("Drawing!");
+                    unsafe {
+                        gl::BindBuffer(gl::FRAMEBUFFER, 0);
+                        gl::ClearColor(0.0, 0.0, 0.0, 0.0);
+                        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+
+                    }
+
+                    raytracing::draw(fb, tex, dims, &mut data);
+                    gl_window.swap_buffers().unwrap();
+                    println!("Finished Drawing!");
+
+                    start_time = std::time::Instant::now();
+                }
+
+            },
+            _ => (),
+        }
+
+        match *control_flow {
+            ControlFlow::Exit => (),
+            _ => {
+                gl_window.window().request_redraw();
+
+                let elapsed_time = std::time::Instant::now().duration_since(start_time).as_millis() as u64;
+
+                // How long should we wait for to run at 60 fps?
+                let wait_millis = match 1000 / TARGET_FPS >= elapsed_time {
+                    true => 1000 / TARGET_FPS - elapsed_time,
+                    false => 0
+                };
+
+                let new_inst = start_time + std::time::Duration::from_millis(wait_millis);
+                // Wait that long
+                *control_flow =  ControlFlow::WaitUntil(new_inst);
+                //println!("Hitting fps goal!");
+            }
+        }
+    });
+}
 
 fn shape_path(name: &str) -> String {
     String::from(MEDIA_PATH_BASE.join(Path::new(name)).to_str().unwrap())
