@@ -8,10 +8,12 @@ use graphics_lib::three_d::shape::Shape;
 use std::ffi::CString;
 use std::path::Path;
 use std::ptr;
+use glutin::dpi::PhysicalSize;
 
 use graphics_lib::three_d::shaders::{*, self};
 use graphics_lib::three_d;
 use graphics_lib::matrix::*;
+use graphics_lib::three_d::raytracing::{image_height, image_width};
 use three_d::raytracing;
 
 // Set a target for fps (don't run faster or slower than this)
@@ -23,7 +25,8 @@ lazy_static! {
 fn main() {
     let event_loop = glutin::event_loop::EventLoop::new();
     let window: glutin::window::WindowBuilder = glutin::window::WindowBuilder::new()
-        .with_title("Graphics Lib");
+        .with_title("Graphics Lib")
+        .with_inner_size(PhysicalSize::new(raytracing::image_width, raytracing::image_height));
     let gl_window = glutin::ContextBuilder::new()
         .build_windowed(window, &event_loop)
         .unwrap();
@@ -171,7 +174,13 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
 
     let mut start_time = std::time::Instant::now();
 
-    let mut data = vec![0.0_f32; raytracing::image_width as usize * raytracing::image_height as usize * 4].into_boxed_slice();
+    let data = vec![0.0_f32; raytracing::image_width as usize * raytracing::image_height as usize * 4].into_boxed_slice();
+    let mut data = unsafe {
+        let v_raw = Box::into_raw(data);
+        let v_raw = v_raw as *mut [[[f32; 4]; image_width as usize]; image_height as usize];
+        Box::from_raw(v_raw)
+    };
+
     event_loop.run(move |event, _, control_flow| {
 
         use glutin::event::{Event, WindowEvent};
@@ -197,7 +206,6 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
                 if wait_millis == 0 {
                     // Update time
                     t += delta;
-                    println!("Drawing!");
                     unsafe {
                         gl::BindBuffer(gl::FRAMEBUFFER, 0);
                         gl::ClearColor(0.0, 0.0, 0.0, 0.0);
@@ -207,7 +215,6 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
 
                     raytracing::draw(fb, tex, dims, &mut data);
                     gl_window.swap_buffers().unwrap();
-                    println!("Finished Drawing!");
 
                     start_time = std::time::Instant::now();
                 }
