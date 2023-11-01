@@ -1,3 +1,4 @@
+use crate::three_d::raytracing::interval::Interval;
 use crate::three_d::raytracing::ray::Ray;
 use crate::three_d::raytracing::vector::Vec3;
 
@@ -26,7 +27,7 @@ impl HitRecord {
 }
 
 pub trait RTObject {
-    fn ray_intersects(&self, r: &Ray, tmin: f32, tmax: f32) -> Option<HitRecord>;
+    fn ray_intersects(&self, r: &Ray, ray_t: Interval) -> Option<HitRecord>;
 }
 
 pub struct RTObjectVec {
@@ -40,13 +41,13 @@ impl RTObjectVec {
 }
 
 impl RTObject for RTObjectVec {
-    fn ray_intersects(&self, r: &Ray, tmin: f32, tmax: f32) -> Option<HitRecord> {
+    fn ray_intersects(&self, r: &Ray, mut ray_t: Interval) -> Option<HitRecord> {
         let mut hit_anything = false;
-        let mut closest_so_far = tmax;
+        let mut closest_so_far = ray_t.max;
         let mut final_rec = HitRecord::default();
 
         for object in &self.objects {
-            if let Some(rec) = object.ray_intersects(r, tmin, closest_so_far) {
+            if let Some(rec) = object.ray_intersects(r, ray_t.replace_max(closest_so_far)) {
                 hit_anything = true;
                 closest_so_far = rec.t;
                 final_rec = rec;
@@ -70,7 +71,7 @@ impl Sphere {
 }
 
 impl RTObject for Sphere {
-    fn ray_intersects(&self, r: &Ray, tmin: f32, tmax: f32) -> Option<HitRecord> {
+    fn ray_intersects(&self, r: &Ray, ray_t: Interval) -> Option<HitRecord> {
         let oc = r.origin() - self.center;
         let a = r.direction().length_squared();
         let half_b = Vec3::dot(&oc, &r.direction());
@@ -83,9 +84,9 @@ impl RTObject for Sphere {
 
         // Find the nearest root in an acceptable range
         let root = (-half_b - sqrt_d) / a;
-        if root <= tmin || tmax <= root {
+        if !ray_t.surrounds(root) {
             let root = (-half_b + sqrt_d) / a;
-            if root <= tmin || tmax <= root {
+            if !ray_t.surrounds(root) {
                 return None;
             }
         }

@@ -13,13 +13,19 @@ use glutin::dpi::PhysicalSize;
 use graphics_lib::three_d::shaders::{*, self};
 use graphics_lib::three_d;
 use graphics_lib::matrix::*;
-use graphics_lib::three_d::raytracing::{image_height, image_width};
+use graphics_lib::three_d::raytracing::camera::Camera;
 use graphics_lib::three_d::raytracing::shape::{RTObjectVec, Sphere};
 use graphics_lib::three_d::raytracing::vector::Vec3;
 use three_d::raytracing;
 
 // Set a target for fps (don't run faster or slower than this)
 const TARGET_FPS: u64 = 10;
+const ASPECT_RATIO: f32 = 16.0 / 9.0;
+const IMAGE_WIDTH: i32 = 1400;
+const IMAGE_HEIGHT: i32 = (IMAGE_WIDTH as f32 / ASPECT_RATIO) as i32;
+const FOCAL_LENGTH: f32 = 1.0;
+const VIEWPORT_HEIGHT: f32 = 2.0;
+
 lazy_static! {
     static ref MEDIA_PATH_BASE: &'static Path = Path::new("media");
 }
@@ -28,7 +34,7 @@ fn main() {
     let event_loop = glutin::event_loop::EventLoop::new();
     let window: glutin::window::WindowBuilder = glutin::window::WindowBuilder::new()
         .with_title("Graphics Lib")
-        .with_inner_size(PhysicalSize::new(raytracing::image_width, raytracing::image_height));
+        .with_inner_size(PhysicalSize::new(IMAGE_WIDTH, IMAGE_HEIGHT));
     let gl_window = glutin::ContextBuilder::new()
         .build_windowed(window, &event_loop)
         .unwrap();
@@ -162,7 +168,7 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         gl::GenTextures(1, &mut tex);
         gl::BindTexture(gl::TEXTURE_2D, tex);
 
-        gl::TexStorage2D(gl::TEXTURE_2D, 1, gl::RGBA32F, raytracing::image_width as i32, raytracing::image_height);
+        gl::TexStorage2D(gl::TEXTURE_2D, 1, gl::RGBA32F, IMAGE_WIDTH, IMAGE_HEIGHT);
 
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
@@ -176,16 +182,11 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
 
     let mut start_time = std::time::Instant::now();
 
-    let data = vec![0.0_f32; raytracing::image_width as usize * raytracing::image_height as usize * 4].into_boxed_slice();
-    let mut data = unsafe {
-        let v_raw = Box::into_raw(data);
-        let v_raw = v_raw as *mut [[[f32; 4]; image_width as usize]; image_height as usize];
-        Box::from_raw(v_raw)
-    };
-
     let mut world = RTObjectVec::new();
     world.add(Box::new(Sphere::new(Vec3::new([0.0, 0.0, -1.0]), 0.5)));
     world.add(Box::new(Sphere::new(Vec3::new([0.0, -100.5, -1.0]), 100.0)));
+
+    let mut camera = Camera::new(ASPECT_RATIO, IMAGE_WIDTH, FOCAL_LENGTH, VIEWPORT_HEIGHT);
 
     event_loop.run(move |event, _, control_flow| {
 
@@ -219,7 +220,7 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
 
                     }
 
-                    raytracing::draw(fb, tex, dims, &mut data, &world);
+                    camera.render(&world, fb, tex, dims);
                     gl_window.swap_buffers().unwrap();
 
                     start_time = std::time::Instant::now();
