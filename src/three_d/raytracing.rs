@@ -7,7 +7,7 @@ use gl::types::*;
 
 use vector::*;
 use ray::*;
-use crate::three_d::raytracing::shape::{RTObject, Sphere};
+use crate::three_d::raytracing::shape::{RTObject, RTObjectVec, Sphere};
 
 const aspect_ratio: f32 = 16.0 / 9.0;
 pub const image_width: i32 = 1400;
@@ -21,12 +21,10 @@ const focal_length: f32 = 1.0;
 const viewport_height: f32 = 2.0;
 const viewport_width: f32 = viewport_height * image_width as f32 / image_height as f32;
 
-pub fn ray_color(r: &Ray) -> Vec3 {
-    let s = Sphere::new(Vec3::new([0.0, 0.0, -1.0]), 0.5);
-    let rec_wrap = s.ray_intersects(r, 0.0, 1000.0);
+pub fn ray_color(r: &Ray, world: &RTObjectVec) -> Vec3 {
+    let rec_wrap = world.ray_intersects(r, 0.0, f32::INFINITY);
     if let Some(rec) = rec_wrap {
-        let norm = (r.at(rec.t) - Vec3::new([0.0, 0.0, -1.0])).unit();
-        return (Vec3::new([1.0; 3]) + norm) * 0.5;
+        return (rec.normal + Vec3::new([1.0; 3])) * 0.5;
     }
 
     let unit = r.direction().unit();
@@ -35,7 +33,7 @@ pub fn ray_color(r: &Ray) -> Vec3 {
     Vec3::new([1.0; 3]) * (1.0 - a) + Vec3::new([0.5, 0.7, 1.0]) * a
 }
 
-pub fn draw(fb: GLuint, tex: GLuint, dims: (i32, i32), data: &mut Box<[[[f32; 4]; image_width as usize]; image_height as usize]>) {
+pub fn draw(fb: GLuint, tex: GLuint, dims: (i32, i32), data: &mut Box<[[[f32; 4]; image_width as usize]; image_height as usize]>, world: &RTObjectVec) {
     let camera_center = Vec3::new([0.0, 0.0, 0.0]);
 
     // Calculate the vectors across the horizontal and down the vertical viewport edges.
@@ -57,7 +55,7 @@ pub fn draw(fb: GLuint, tex: GLuint, dims: (i32, i32), data: &mut Box<[[[f32; 4]
             let ray_direction = pixel_center - camera_center;
             let r = Ray::new(camera_center, ray_direction);
 
-            let pixel_color = ray_color(&r);
+            let pixel_color = ray_color(&r, world);
             data[j as usize][i as usize][0..3].copy_from_slice(&pixel_color.data());
             data[j as usize][i as usize][3] = 1.0;
 

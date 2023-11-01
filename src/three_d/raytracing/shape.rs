@@ -29,6 +29,35 @@ pub trait RTObject {
     fn ray_intersects(&self, r: &Ray, tmin: f32, tmax: f32) -> Option<HitRecord>;
 }
 
+pub struct RTObjectVec {
+    objects: Vec<Box<dyn RTObject>>,
+}
+
+impl RTObjectVec {
+    pub fn new() -> RTObjectVec { RTObjectVec { objects: Vec::new() } }
+    pub fn clear(&mut self) { self.objects.clear(); }
+    pub fn add(&mut self, object: Box<dyn RTObject>) { self.objects.push(object); }
+}
+
+impl RTObject for RTObjectVec {
+    fn ray_intersects(&self, r: &Ray, tmin: f32, tmax: f32) -> Option<HitRecord> {
+        let mut hit_anything = false;
+        let mut closest_so_far = tmax;
+        let mut final_rec = HitRecord::default();
+
+        for object in &self.objects {
+            if let Some(rec) = object.ray_intersects(r, tmin, closest_so_far) {
+                hit_anything = true;
+                closest_so_far = rec.t;
+                final_rec = rec;
+            }
+        }
+
+        if (hit_anything) { Some(final_rec) }
+        else { None }
+    }
+}
+
 pub struct Sphere {
     center: Vec3,
     radius: f32,

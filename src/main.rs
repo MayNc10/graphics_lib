@@ -14,6 +14,8 @@ use graphics_lib::three_d::shaders::{*, self};
 use graphics_lib::three_d;
 use graphics_lib::matrix::*;
 use graphics_lib::three_d::raytracing::{image_height, image_width};
+use graphics_lib::three_d::raytracing::shape::{RTObjectVec, Sphere};
+use graphics_lib::three_d::raytracing::vector::Vec3;
 use three_d::raytracing;
 
 // Set a target for fps (don't run faster or slower than this)
@@ -181,6 +183,10 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         Box::from_raw(v_raw)
     };
 
+    let mut world = RTObjectVec::new();
+    world.add(Box::new(Sphere::new(Vec3::new([0.0, 0.0, -1.0]), 0.5)));
+    world.add(Box::new(Sphere::new(Vec3::new([0.0, -100.5, -1.0]), 100.0)));
+
     event_loop.run(move |event, _, control_flow| {
 
         use glutin::event::{Event, WindowEvent};
@@ -213,7 +219,7 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
 
                     }
 
-                    raytracing::draw(fb, tex, dims, &mut data);
+                    raytracing::draw(fb, tex, dims, &mut data, &world);
                     gl_window.swap_buffers().unwrap();
 
                     start_time = std::time::Instant::now();
