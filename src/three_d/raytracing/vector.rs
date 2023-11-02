@@ -1,4 +1,7 @@
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, Sub};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, Range, RangeInclusive, Sub};
+use rand::distributions::uniform::SampleRange;
+use rand::Rng;
+use rand::rngs::ThreadRng;
 
 #[derive(Copy, Clone)]
 pub struct Vec3 {
@@ -15,6 +18,7 @@ impl Vec3 {
     pub fn unit(&self) -> Vec3 {
         *self / self.length()
     }
+    pub fn to_unit(self) -> Vec3 { self / self.length() }
 
     pub fn x(&self) -> f32 { self.data[0] }
     pub fn y(&self) -> f32 { self.data[1] }
@@ -34,6 +38,28 @@ impl Vec3 {
 impl Vec3 {
     pub fn dot(v1: &Vec3, v2: &Vec3) -> f32 {
         v1.x() * v2.x() + v1.y() * v2.y() + v1.z() * v2.z()
+    }
+    pub fn random(rng: &mut ThreadRng) -> Vec3 {
+        Vec3 { data: rng.gen() }
+    }
+
+    pub fn random_in_range<R>(rng: &mut ThreadRng, range: R) -> Vec3
+    where
+        R: SampleRange<f32> + Clone
+    {
+        Vec3 { data: [rng.gen_range(range.clone()), rng.gen_range(range.clone()), rng.gen_range(range)] }
+    }
+
+    pub fn random_in_unit_sphere(rng: &mut ThreadRng) -> Vec3 {
+        loop {
+            let v = Vec3::random_in_range(rng, -1.0..=1.0);
+            if v.length_squared() < 1.0 { return v }
+        }
+    }
+
+    pub fn random_on_hemisphere(rng: &mut ThreadRng, normal: &Vec3) -> Vec3 {
+        let v = Vec3::random_in_unit_sphere(rng).to_unit();
+        if Vec3::dot(&v, normal) > 0.0 { v } else { v * -1 }
     }
 }
 

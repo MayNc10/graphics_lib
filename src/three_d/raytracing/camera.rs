@@ -28,10 +28,11 @@ pub struct Camera {
 
     samples_per_pixel: i32,
     rng: ThreadRng,
+    max_depth: i32,
 }
 
 impl Camera {
-    pub fn new(aspect_ratio: f32, image_width: i32, focal_length: f32, viewport_height: f32, samples_per_pixel: i32) -> Camera {
+    pub fn new(aspect_ratio: f32, image_width: i32, focal_length: f32, viewport_height: f32, samples_per_pixel: i32, max_depth: i32) -> Camera {
         let image_height = (image_width as f32 / aspect_ratio) as i32;
         let viewport_width: f32 = viewport_height * image_width as f32 / image_height as f32;
         let camera_center = Vec3::new([0.0, 0.0, 0.0]);
@@ -51,7 +52,7 @@ impl Camera {
         Camera { aspect_ratio, image_width, image_height, focal_length, viewport_width, viewport_height,
             camera_center, pixel00_loc, pixel_delta_u, pixel_delta_v,
             saved_dims: (0, 0),
-            data: Box::new([]), samples_per_pixel, rng: thread_rng(),
+            data: Box::new([]), samples_per_pixel, rng: thread_rng(), max_depth
         }
     }
     pub fn render(&mut self, world: &dyn RTObject, fb: GLuint, tex: GLuint, dims: (i32, i32)) {
@@ -63,16 +64,25 @@ impl Camera {
 
         // Render
         for j in 0..self.image_height {
+            let current_idx = (j * self.image_width) as f32;
+            let max_idx = (self.image_height * self.image_width) as f32;
+
+            print!("\rProgress: {}%, idx: {} out of {}", current_idx/max_idx * 100.0, current_idx as u32, max_idx as u32);
+
             for i in 0..self.image_width {
+
+
                 let mut pixel_color = Vec3::new([0.0; 3]);
                 for sample in 0..self.samples_per_pixel {
                     let r = self.get_ray(i, j);
-                    pixel_color += Camera::ray_color(&r, world);
+                    pixel_color += Camera::ray_color(&r, world, &mut self.rng, self.max_depth);
                 }
 
                 pixel_color /= self.samples_per_pixel;
                 let clamping: fn(f32) -> f32 = |num| INTENSITY.clamp(num);
                 pixel_color.for_each(&clamping);
+                let gamma_correction: fn(f32) -> f32 = |num| Camera::correct_gamma(num);
+                pixel_color.for_each(&gamma_correction);
 
                 //let mut vals = unsafe { *data.index(j as usize, i as usize, self.image_width as usize) };
                 let idx = (j * self.image_width + i) * 4;
@@ -118,10 +128,15 @@ impl Camera {
         self.pixel_delta_u * px + self.pixel_delta_v * py
     }
 
-    fn ray_color(r: &Ray, world: &dyn RTObject) -> Vec3 {
-        let rec_wrap = world.ray_intersects(r, Interval::new(0.0, f32::INFINITY));
+    fn ray_color(r: &Ray, world: &dyn RTObject, rng: &mut ThreadRng, depth: i32) -> Vec3 {
+        // Don't gather more light if we've reached the depth
+        if depth <= 0 { return Vec3::new([0.0; 3]) }
+
+        // Ignore hits that are too close, they are probably from "shadow acne"
+        let rec_wrap = world.ray_intersects(r, Interval::new(0.001, f32::INFINITY));
         if let Some(rec) = rec_wrap {
-            return (rec.normal + Vec3::new([1.0; 3])) * 0.5;
+            let direction = rec.normal + Vec3::random_in_unit_sphere(rng).to_unit();
+            return Camera::ray_color(&Ray::new(rec.p, direction), world, rng, depth - 1) * 0.5;
         }
 
         let unit = r.direction().unit();
@@ -129,4 +144,6 @@ impl Camera {
 
         Vec3::new([1.0; 3]) * (1.0 - a) + Vec3::new([0.5, 0.7, 1.0]) * a
     }
+
+    fn correct_gamma(x: f32) -> f32 { x.sqrt() }
 }

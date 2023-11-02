@@ -25,7 +25,8 @@ const IMAGE_WIDTH: i32 = 1400;
 const IMAGE_HEIGHT: i32 = (IMAGE_WIDTH as f32 / ASPECT_RATIO) as i32;
 const FOCAL_LENGTH: f32 = 1.0;
 const VIEWPORT_HEIGHT: f32 = 2.0;
-const SAMPLES_PER_PIXEL: i32 = 5;
+const SAMPLES_PER_PIXEL: i32 = 500;
+const MAX_DEPTH: i32 = 100;
 
 lazy_static! {
     static ref MEDIA_PATH_BASE: &'static Path = Path::new("media");
@@ -187,7 +188,19 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     world.add(Box::new(Sphere::new(Vec3::new([0.0, 0.0, -1.0]), 0.5)));
     world.add(Box::new(Sphere::new(Vec3::new([0.0, -100.5, -1.0]), 100.0)));
 
-    let mut camera = Camera::new(ASPECT_RATIO, IMAGE_WIDTH, FOCAL_LENGTH, VIEWPORT_HEIGHT, SAMPLES_PER_PIXEL);
+    let mut camera = Camera::new(ASPECT_RATIO, IMAGE_WIDTH, FOCAL_LENGTH,
+                                 VIEWPORT_HEIGHT, SAMPLES_PER_PIXEL, MAX_DEPTH);
+
+    // Render once
+    unsafe {
+        gl::BindBuffer(gl::FRAMEBUFFER, 0);
+        gl::ClearColor(0.0, 0.0, 0.0, 0.0);
+        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+
+    }
+
+    camera.render(&world, fb, tex, dims);
+    gl_window.swap_buffers().unwrap();
 
     event_loop.run(move |event, _, control_flow| {
 
@@ -214,15 +227,8 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
                 if wait_millis == 0 {
                     // Update time
                     t += delta;
-                    unsafe {
-                        gl::BindBuffer(gl::FRAMEBUFFER, 0);
-                        gl::ClearColor(0.0, 0.0, 0.0, 0.0);
-                        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
-                    }
-
-                    camera.render(&world, fb, tex, dims);
-                    gl_window.swap_buffers().unwrap();
+                    //gl_window.swap_buffers().unwrap();
 
                     start_time = std::time::Instant::now();
                 }
