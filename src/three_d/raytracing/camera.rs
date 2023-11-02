@@ -135,8 +135,11 @@ impl Camera {
         // Ignore hits that are too close, they are probably from "shadow acne"
         let rec_wrap = world.ray_intersects(r, Interval::new(0.001, f32::INFINITY));
         if let Some(rec) = rec_wrap {
-            let direction = rec.normal + Vec3::random_in_unit_sphere(rng).to_unit();
-            return Camera::ray_color(&Ray::new(rec.p, direction), world, rng, depth - 1) * 0.5;
+            return {
+                if let Some((attenuation, scattered)) = rec.mat.scatter(*r, rec.self_without_mat()) {
+                    attenuation * Camera::ray_color(&scattered, world, rng, depth - 1)
+                } else { Vec3::new([0.0; 3]) }
+            };
         }
 
         let unit = r.direction().unit();

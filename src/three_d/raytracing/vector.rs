@@ -8,6 +8,8 @@ pub struct Vec3 {
     data: [f32; 3]
 }
 
+const EPSILON: f32 = 1e-8;
+
 impl Vec3 {
     pub fn new(data: [f32; 3]) -> Vec3 { Vec3 { data } }
     pub fn data(&self) -> [f32; 3] { self.data }
@@ -32,6 +34,10 @@ impl Vec3 {
 
     pub fn length_squared(&self) -> f32 {
         Vec3::dot(self, self)
+    }
+
+    pub fn near_zero(&self) -> bool {
+        self.data[0].abs() < EPSILON && self.data[1].abs() < EPSILON && self.data[2].abs() < EPSILON
     }
 }
 

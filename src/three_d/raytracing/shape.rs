@@ -1,30 +1,10 @@
+use std::rc::Rc;
+use crate::three_d::raytracing::hit_record::HitRecord;
 use crate::three_d::raytracing::interval::Interval;
+use crate::three_d::raytracing::material::{EmptyMaterial, Material};
 use crate::three_d::raytracing::ray::Ray;
 use crate::three_d::raytracing::vector::Vec3;
 
-#[derive(Default)]
-pub struct HitRecord {
-    pub p: Vec3,
-    pub normal: Vec3,
-    pub t: f32,
-    pub front_face: bool,
-}
-
-impl HitRecord {
-    pub fn set_face_normal(&mut self, r: &Ray, outward_normal: &Vec3) {
-        self.front_face = Vec3::dot(&r.direction(), outward_normal) < 0.0;
-        self.normal = if self.front_face { *outward_normal } else { *outward_normal * -1.0 };
-    }
-    pub fn new(root: f32, r: &Ray, center: &Vec3, radius: f32) -> HitRecord {
-        let mut rec = HitRecord::default();
-        rec.t = root;
-        rec.p = r.at(rec.t);
-        let outward_normal = (rec.p - *center) / radius;
-        rec.set_face_normal(r, &outward_normal);
-
-        rec
-    }
-}
 
 pub trait RTObject {
     fn ray_intersects(&self, r: &Ray, ray_t: Interval) -> Option<HitRecord>;
@@ -44,7 +24,7 @@ impl RTObject for RTObjectVec {
     fn ray_intersects(&self, r: &Ray, mut ray_t: Interval) -> Option<HitRecord> {
         let mut hit_anything = false;
         let mut closest_so_far = ray_t.max;
-        let mut final_rec = HitRecord::default();
+        let mut final_rec = HitRecord::blank_with_mat(Rc::new(EmptyMaterial {}));
 
         for object in &self.objects {
             if let Some(rec) = object.ray_intersects(r, ray_t.replace_max(closest_so_far)) {
@@ -54,7 +34,7 @@ impl RTObject for RTObjectVec {
             }
         }
 
-        if (hit_anything) { Some(final_rec) }
+        if hit_anything { Some(final_rec) }
         else { None }
     }
 }
@@ -62,11 +42,12 @@ impl RTObject for RTObjectVec {
 pub struct Sphere {
     center: Vec3,
     radius: f32,
+    mat: Rc<dyn Material>
 }
 
 impl Sphere {
-    pub fn new(center: Vec3, radius: f32) -> Sphere {
-        Sphere { center, radius }
+    pub fn new(center: Vec3, radius: f32, mat: Rc<dyn Material>) -> Sphere {
+        Sphere { center, radius, mat }
     }
 }
 
@@ -91,6 +72,6 @@ impl RTObject for Sphere {
             }
         }
 
-        Some(HitRecord::new(root, r, &self.center, self.radius))
+        Some(HitRecord::new(root, r, &self.center, self.radius, self.mat.clone()))
     }
 }
