@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, Sub};
 
 #[derive(Copy, Clone)]
 pub struct Vec3 {
@@ -20,6 +20,12 @@ impl Vec3 {
     pub fn y(&self) -> f32 { self.data[1] }
     pub fn z(&self) -> f32 { self.data[2] }
 
+    pub fn for_each(&mut self, func: &fn(f32) -> f32) {
+        self.data[0] = func(self.data[0]);
+        self.data[1] = func(self.data[1]);
+        self.data[2] = func(self.data[2]);
+    }
+
     pub fn length_squared(&self) -> f32 {
         Vec3::dot(self, self)
     }
@@ -35,6 +41,12 @@ impl Add for Vec3 {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
         Vec3 { data: [self.data[0] + rhs.data[0], self.data[1] + rhs.data[1], self.data[2] + rhs.data[2]] }
+    }
+}
+
+impl AddAssign for Vec3 {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs;
     }
 }
 
@@ -79,6 +91,12 @@ impl Div<i32> for Vec3 {
     fn div(self, rhs: i32) -> Self::Output {
         let rhs = rhs as f32;
         Vec3 { data: [self.data[0] / rhs, self.data[1] / rhs, self.data[2] / rhs] }
+    }
+}
+
+impl DivAssign<i32> for Vec3 {
+    fn div_assign(&mut self, rhs: i32) {
+        *self = *self / rhs;
     }
 }
 

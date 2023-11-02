@@ -2,10 +2,14 @@ use std::ffi::c_void;
 use std::ptr::slice_from_raw_parts;
 use std::slice;
 use gl::types::{GLint, GLuint};
+use rand::rngs::ThreadRng;
+use rand::{Rng, thread_rng};
 use crate::three_d::raytracing::interval::Interval;
 use crate::three_d::raytracing::ray::Ray;
 use crate::three_d::raytracing::shape::RTObject;
 use crate::three_d::raytracing::vector::Vec3;
+
+static INTENSITY: Interval = Interval { min: 0.0, max: 0.999 };
 
 pub struct Camera {
     aspect_ratio: f32,
@@ -21,10 +25,13 @@ pub struct Camera {
 
     saved_dims: (i32, i32),
     data: Box<[f32]>,
+
+    samples_per_pixel: i32,
+    rng: ThreadRng,
 }
 
 impl Camera {
-    pub fn new(aspect_ratio: f32, image_width: i32, focal_length: f32, viewport_height: f32) -> Camera {
+    pub fn new(aspect_ratio: f32, image_width: i32, focal_length: f32, viewport_height: f32, samples_per_pixel: i32) -> Camera {
         let image_height = (image_width as f32 / aspect_ratio) as i32;
         let viewport_width: f32 = viewport_height * image_width as f32 / image_height as f32;
         let camera_center = Vec3::new([0.0, 0.0, 0.0]);
@@ -44,7 +51,7 @@ impl Camera {
         Camera { aspect_ratio, image_width, image_height, focal_length, viewport_width, viewport_height,
             camera_center, pixel00_loc, pixel_delta_u, pixel_delta_v,
             saved_dims: (0, 0),
-            data: Box::new([]),
+            data: Box::new([]), samples_per_pixel, rng: thread_rng(),
         }
     }
     pub fn render(&mut self, world: &dyn RTObject, fb: GLuint, tex: GLuint, dims: (i32, i32)) {
@@ -57,11 +64,16 @@ impl Camera {
         // Render
         for j in 0..self.image_height {
             for i in 0..self.image_width {
-                let pixel_center = self.pixel00_loc + (self.pixel_delta_u * i) + (self.pixel_delta_v * j);
-                let ray_direction = pixel_center - self.camera_center;
-                let r = Ray::new(self.camera_center, ray_direction);
+                let mut pixel_color = Vec3::new([0.0; 3]);
+                for sample in 0..self.samples_per_pixel {
+                    let r = self.get_ray(i, j);
+                    pixel_color += Camera::ray_color(&r, world);
+                }
 
-                let pixel_color = Camera::ray_color(&r, world);
+                pixel_color /= self.samples_per_pixel;
+                let clamping: fn(f32) -> f32 = |num| INTENSITY.clamp(num);
+                pixel_color.for_each(&clamping);
+
                 //let mut vals = unsafe { *data.index(j as usize, i as usize, self.image_width as usize) };
                 let idx = (j * self.image_width + i) * 4;
                 let vals = &mut self.data[idx as usize ..];
@@ -89,6 +101,21 @@ impl Camera {
                                 gl::COLOR_BUFFER_BIT, gl::LINEAR);
 
         }
+    }
+
+    fn get_ray(&mut self, i: i32, j: i32) -> Ray {
+        let pixel_center = self.pixel00_loc + (self.pixel_delta_u * i) + (self.pixel_delta_v * j);
+        let pixel_sample = pixel_center + self.pixel_sample_square();
+
+        let ray_direction = pixel_sample - self.camera_center;
+        Ray::new(self.camera_center, ray_direction)
+    }
+
+    fn pixel_sample_square(&mut self) -> Vec3 {
+        let px = -0.5 + self.rng.gen::<f32>();
+        let py = -0.5 + self.rng.gen::<f32>();
+
+        self.pixel_delta_u * px + self.pixel_delta_v * py
     }
 
     fn ray_color(r: &Ray, world: &dyn RTObject) -> Vec3 {
