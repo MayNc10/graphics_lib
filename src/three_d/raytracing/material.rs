@@ -34,3 +34,14 @@ impl Material for Lambertian {
         Some((self.albedo, Ray::new(rec.p, scatter_direction)))
     }
 }
+
+pub struct Metal {
+    albedo: Vec3,
+}
+
+impl Material for Metal {
+    fn scatter(&self, ray_in: Ray, rec: HitRecordNoMat) -> Option<(Vec3, Ray)> {
+        let reflected = Vec3::reflect(&ray_in.direction().to_unit(), &rec.normal);
+        Some((self.albedo, Ray::new(rec.p, reflected)))
+    }
+}

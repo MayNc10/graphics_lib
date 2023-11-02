@@ -67,6 +67,10 @@ impl Vec3 {
         let v = Vec3::random_in_unit_sphere(rng).to_unit();
         if Vec3::dot(&v, normal) > 0.0 { v } else { v * -1 }
     }
+
+    pub fn reflect(v: &Vec3, n: &Vec3) -> Vec3 {
+        *v - *n * Vec3::dot(v, n) * 2
+    }
 }
 
 impl Add for Vec3 {
