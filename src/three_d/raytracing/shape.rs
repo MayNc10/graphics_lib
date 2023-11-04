@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::sync::Arc;
 use crate::three_d::raytracing::hit_record::HitRecord;
 use crate::three_d::raytracing::interval::Interval;
 use crate::three_d::raytracing::material::{EmptyMaterial, Material};
@@ -6,7 +7,7 @@ use crate::three_d::raytracing::ray::Ray;
 use crate::three_d::raytracing::vector::Vec3;
 
 
-pub trait RTObject {
+pub trait RTObject: Send + Sync {
     fn ray_intersects(&self, r: &Ray, ray_t: Interval) -> Option<HitRecord>;
 }
 
@@ -24,7 +25,7 @@ impl RTObject for RTObjectVec {
     fn ray_intersects(&self, r: &Ray, mut ray_t: Interval) -> Option<HitRecord> {
         let mut hit_anything = false;
         let mut closest_so_far = ray_t.max;
-        let mut final_rec = HitRecord::blank_with_mat(Rc::new(EmptyMaterial {}));
+        let mut final_rec = HitRecord::blank_with_mat(Arc::new(EmptyMaterial {}));
 
         for object in &self.objects {
             if let Some(rec) = object.ray_intersects(r, ray_t.replace_max(closest_so_far)) {
@@ -42,11 +43,11 @@ impl RTObject for RTObjectVec {
 pub struct Sphere {
     center: Vec3,
     radius: f32,
-    mat: Rc<dyn Material>
+    mat: Arc<dyn Material>
 }
 
 impl Sphere {
-    pub fn new(center: Vec3, radius: f32, mat: Rc<dyn Material>) -> Sphere {
+    pub fn new(center: Vec3, radius: f32, mat: Arc<dyn Material>) -> Sphere {
         Sphere { center, radius, mat }
     }
 }

@@ -1,3 +1,4 @@
+use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, Range, RangeInclusive, Sub};
 use rand::distributions::uniform::SampleRange;
 use rand::Rng;
@@ -139,5 +140,11 @@ impl DivAssign<i32> for Vec3 {
 impl Default for Vec3 {
     fn default() -> Self {
         Vec3::new([0.0; 3])
+    }
+}
+
+impl Sum for Vec3 {
+    fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
+        iter.fold(Vec3::default(), |a, b| a + b)
     }
 }

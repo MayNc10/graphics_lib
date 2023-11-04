@@ -1,15 +1,25 @@
 use std::ffi::c_void;
-use std::ptr::slice_from_raw_parts;
-use std::slice;
+use std::ops::Add;
+use std::ptr::{slice_from_raw_parts, slice_from_raw_parts_mut};
+use std::slice::from_raw_parts;
+use std::sync::Arc;
 use gl::types::{GLint, GLuint};
 use rand::rngs::ThreadRng;
 use rand::{Rng, thread_rng};
+use rayon::prelude::*;
 use crate::three_d::raytracing::interval::Interval;
 use crate::three_d::raytracing::ray::Ray;
 use crate::three_d::raytracing::shape::RTObject;
 use crate::three_d::raytracing::vector::Vec3;
 
 static INTENSITY: Interval = Interval { min: 0.0, max: 0.999 };
+
+// helper function
+fn flatten<T: Copy, const N: usize>(data: &[[T; N]]) -> &[T] {
+    unsafe {
+        from_raw_parts(data.as_ptr() as *const _, data.len() * N)
+    }
+}
 
 pub struct Camera {
     aspect_ratio: f32,
@@ -113,6 +123,66 @@ impl Camera {
         }
     }
 
+    pub fn render_parallel(&mut self, world: &dyn RTObject, fb: GLuint, tex: GLuint, dims: (i32, i32)) {
+        // Reallocate data
+        if self.saved_dims != dims {
+            self.data = vec![0.0_f32; (self.image_height * self.image_width * 4) as usize].into_boxed_slice();
+            self.saved_dims = dims;
+        }
+        // Make world cross-thread
+        let arc_world = Arc::new(world);
+        let data_ptr = self.data.as_mut_ptr() as usize;
+
+        let idx_iter = (0..(self.image_height * self.image_width)).into_par_iter();
+        idx_iter.for_each(|idx| {
+            let j = idx / self.image_width;
+            let i = idx % self.image_width;
+
+            // Collect samples in parallel as well
+            let samples_iter = (0..self.samples_per_pixel).into_par_iter();
+            let mut pixel_color: Vec3 = samples_iter.map(|_| {
+                let r = Camera::get_ray_cmethod(i, j, self.pixel00_loc, self.pixel_delta_u, self.pixel_delta_v, self.camera_center);
+                Camera::ray_color_parallel(&r, arc_world.clone(), self.max_depth)
+            }).sum();
+
+            pixel_color /= self.samples_per_pixel;
+            let clamping: fn(f32) -> f32 = |num| INTENSITY.clamp(num);
+            pixel_color.for_each(&clamping);
+            let gamma_correction: fn(f32) -> f32 = |num| Camera::correct_gamma(num);
+            pixel_color.for_each(&gamma_correction);
+
+            // This is *really* dangerous, but it should work
+            unsafe {
+                let data_ptr = (data_ptr as *mut f32).add(idx as usize * 4);
+                *data_ptr = pixel_color.x();
+                *data_ptr.add(1) = pixel_color.y();
+                *data_ptr.add(2) = pixel_color.z();
+                *data_ptr.add(3) = 1.0;
+            }
+        });
+
+        unsafe {
+            gl::BindTexture(gl::TEXTURE_2D, tex);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as GLint);
+
+            //gl::PixelStorei(gl::PACK_ALIGNMENT, 1);
+            gl::TexSubImage2D(gl::TEXTURE_2D, 0, 0, 0,
+                              self.image_width, self.image_height, gl::RGBA, gl::FLOAT,
+                              self.data.as_ptr() as *const _);
+
+            gl::BindFramebuffer(gl::FRAMEBUFFER, fb);
+
+            gl::BindFramebuffer(gl::READ_FRAMEBUFFER, fb);
+            gl::BindFramebuffer(gl::DRAW_FRAMEBUFFER, 0);
+
+            gl::BlitFramebuffer(0, 0, self.image_width, self.image_height, 0, 0, dims.0, dims.1,
+                                gl::COLOR_BUFFER_BIT, gl::LINEAR);
+
+        }
+    }
+
+
     fn get_ray(&mut self, i: i32, j: i32) -> Ray {
         let pixel_center = self.pixel00_loc + (self.pixel_delta_u * i) + (self.pixel_delta_v * j);
         let pixel_sample = pixel_center + self.pixel_sample_square();
@@ -121,11 +191,28 @@ impl Camera {
         Ray::new(self.camera_center, ray_direction)
     }
 
+    fn get_ray_cmethod(i: i32, j: i32, pixel00_loc: Vec3, pixel_delta_u: Vec3, pixel_delta_v: Vec3, camera_center: Vec3) -> Ray {
+        let pixel_center = pixel00_loc + (pixel_delta_u * i) + (pixel_delta_v * j);
+        let pixel_sample = pixel_center + Camera::pixel_sample_square_cmethod(pixel_delta_u, pixel_delta_v);
+
+        let ray_direction = pixel_sample - camera_center;
+        Ray::new(camera_center, ray_direction)
+    }
+
     fn pixel_sample_square(&mut self) -> Vec3 {
         let px = -0.5 + self.rng.gen::<f32>();
         let py = -0.5 + self.rng.gen::<f32>();
 
         self.pixel_delta_u * px + self.pixel_delta_v * py
+    }
+
+    fn pixel_sample_square_cmethod(pixel_delta_u: Vec3, pixel_delta_v: Vec3) -> Vec3 {
+        let mut rng = thread_rng();
+
+        let px = -0.5 + rng.gen::<f32>();
+        let py = -0.5 + rng.gen::<f32>();
+
+        pixel_delta_u * px + pixel_delta_v * py
     }
 
     fn ray_color(r: &Ray, world: &dyn RTObject, rng: &mut ThreadRng, depth: i32) -> Vec3 {
@@ -146,6 +233,11 @@ impl Camera {
         let a = 0.5 * (unit.y() + 1.0);
 
         Vec3::new([1.0; 3]) * (1.0 - a) + Vec3::new([0.5, 0.7, 1.0]) * a
+    }
+
+    fn ray_color_parallel(r: &Ray, world: Arc<&dyn RTObject>, depth: i32) -> Vec3 {
+        let mut rng = thread_rng();
+        Camera::ray_color(r, *world, &mut rng, depth)
     }
 
     fn correct_gamma(x: f32) -> f32 { x.sqrt() }

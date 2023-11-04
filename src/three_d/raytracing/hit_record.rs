@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::sync::Arc;
 use crate::three_d::raytracing::material::Material;
 use crate::three_d::raytracing::ray::Ray;
 use crate::three_d::raytracing::vector::Vec3;
@@ -7,7 +8,7 @@ pub struct HitRecord {
     pub p: Vec3,
     pub normal: Vec3,
     // This could be a reference or an Rc, but this makes it easier
-    pub mat: Rc<dyn Material>,
+    pub mat: Arc<dyn Material>,
     pub t: f32,
     pub front_face: bool,
 }
@@ -17,7 +18,7 @@ impl HitRecord {
         self.front_face = Vec3::dot(&r.direction(), outward_normal) < 0.0;
         self.normal = if self.front_face { *outward_normal } else { *outward_normal * -1.0 };
     }
-    pub fn blank_with_mat(mat: Rc<dyn Material>) -> HitRecord {
+    pub fn blank_with_mat(mat: Arc<dyn Material>) -> HitRecord {
         HitRecord {
             p: Default::default(),
             normal: Default::default(),
@@ -27,7 +28,7 @@ impl HitRecord {
         }
     }
 
-    pub fn new(root: f32, r: &Ray, center: &Vec3, radius: f32, mat: Rc<dyn Material>) -> HitRecord {
+    pub fn new(root: f32, r: &Ray, center: &Vec3, radius: f32, mat: Arc<dyn Material>) -> HitRecord {
         let mut rec = HitRecord::blank_with_mat(mat);
         rec.t = root;
         rec.p = r.at(rec.t);

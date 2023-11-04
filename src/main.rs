@@ -9,13 +9,14 @@ use std::ffi::CString;
 use std::path::Path;
 use std::ptr;
 use std::rc::Rc;
+use std::sync::Arc;
 use glutin::dpi::PhysicalSize;
 
 use graphics_lib::three_d::shaders::{*, self};
 use graphics_lib::three_d;
 use graphics_lib::matrix::*;
 use graphics_lib::three_d::raytracing::camera::Camera;
-use graphics_lib::three_d::raytracing::material::Lambertian;
+use graphics_lib::three_d::raytracing::material::{Lambertian, Metal};
 use graphics_lib::three_d::raytracing::shape::{RTObjectVec, Sphere};
 use graphics_lib::three_d::raytracing::vector::Vec3;
 use three_d::raytracing;
@@ -188,10 +189,15 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
 
     let mut world = RTObjectVec::new();
     world.add(Box::new(Sphere::new(Vec3::new([0.0, 0.0, -1.0]), 0.5,
-                                   Rc::new(Lambertian::new(Vec3::new([1.0; 3]))) )));
+                                   Arc::new(Metal::new(Vec3::new([0.96, 0.4, 0.02]), 0.0)) )));
+
+
+    world.add(Box::new(Sphere::new(Vec3::new([0.8, -0.2, -1.0]), 0.3,
+                                   Arc::new(Metal::new(Vec3::new([0.6, 0.1, 0.7]), 0.0)) )));
 
     world.add(Box::new(Sphere::new(Vec3::new([0.0, -100.5, -1.0]), 100.0,
-                                   Rc::new(Lambertian::new(Vec3::new([0.01, 0.63, 0.98]) )))));
+                                   Arc::new(Lambertian::new(Vec3::new([0.01, 0.63, 0.98]) )))));
+
 
     let mut camera = Camera::new(ASPECT_RATIO, IMAGE_WIDTH, FOCAL_LENGTH,
                                  VIEWPORT_HEIGHT, SAMPLES_PER_PIXEL, MAX_DEPTH);
@@ -204,7 +210,7 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
 
     }
 
-    camera.render(&world, fb, tex, dims);
+    camera.render_parallel(&world, fb, tex, dims);
     gl_window.swap_buffers().unwrap();
 
     event_loop.run(move |event, _, control_flow| {
