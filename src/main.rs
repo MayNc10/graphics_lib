@@ -1,5 +1,6 @@
 use glutin::event_loop::EventLoop;
 use lazy_static::lazy_static;
+use clap::Parser;
 use graphics_lib::three_d::buffer::FrameBuffer;
 use graphics_lib::three_d::scene::{Scene, init_deferred_quad};
 use graphics_lib::three_d::lights::{DirectionLight, PointLight};
@@ -11,25 +12,29 @@ use std::ptr;
 use std::rc::Rc;
 use std::sync::Arc;
 use glutin::dpi::PhysicalSize;
+use rand::{random, Rng, thread_rng};
+use graphics_lib::cli::Cli;
 
 use graphics_lib::three_d::shaders::{*, self};
 use graphics_lib::three_d;
 use graphics_lib::matrix::*;
 use graphics_lib::three_d::raytracing::camera::Camera;
-use graphics_lib::three_d::raytracing::material::{Lambertian, Metal};
+use graphics_lib::three_d::raytracing::material::{Dielectric, Lambertian, Metal};
 use graphics_lib::three_d::raytracing::shape::{RTObjectVec, Sphere};
 use graphics_lib::three_d::raytracing::vector::Vec3;
-use three_d::raytracing;
 
 // Set a target for fps (don't run faster or slower than this)
 const TARGET_FPS: u64 = 10;
 const ASPECT_RATIO: f32 = 16.0 / 9.0;
-const IMAGE_WIDTH: i32 = 1400;
+const IMAGE_WIDTH: i32 = 1200;
 const IMAGE_HEIGHT: i32 = (IMAGE_WIDTH as f32 / ASPECT_RATIO) as i32;
 const FOCAL_LENGTH: f32 = 1.0;
-const VIEWPORT_HEIGHT: f32 = 2.0;
-const SAMPLES_PER_PIXEL: i32 = 500;
-const MAX_DEPTH: i32 = 100;
+const VFOV: f32 = 20.0;
+const LOOK_FROM: Vec3 = Vec3 { data: [13.0, 2.0, 3.0] };
+const LOOK_AT: Vec3 = Vec3 { data: [0.0; 3] };
+const VUP: Vec3 = Vec3 { data: [0.0, 1.0, 0.0] };
+const SAMPLES_PER_PIXEL: i32 = 10;
+const MAX_DEPTH: i32 = 10;
 
 lazy_static! {
     static ref MEDIA_PATH_BASE: &'static Path = Path::new("media");
@@ -159,6 +164,8 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         //gl::DepthFunc(gl::LESS);
     }
 
+    let cli = Cli::parse();
+
     let mut dims_ps = gl_window.window().inner_size();
     let mut dims = (dims_ps.width as i32, dims_ps.height as i32);
 
@@ -188,19 +195,46 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     let mut start_time = std::time::Instant::now();
 
     let mut world = RTObjectVec::new();
-    world.add(Box::new(Sphere::new(Vec3::new([0.0, 0.0, -1.0]), 0.5,
-                                   Arc::new(Metal::new(Vec3::new([0.96, 0.4, 0.02]), 0.0)) )));
+
+    let ground_mat = Arc::new(Lambertian::new(Vec3::new([0.5; 3])));
+    world.add(Box::new(Sphere::new( [0.0, -1000.0, 0.0].into(), 1000.0, ground_mat.clone() )) );
+
+    for a in -11..11 {
+        for b in -11..11 {
+            let choose_mat = random::<f32>();
+            let center = Vec3::new([a as f32 + 0.9 * random::<f32>(), 0.2, b as f32 + 0.9 * random::<f32>()]);
+
+            if choose_mat < 0.8 {
+                // diffuse
+                let albedo = Vec3::random(&mut thread_rng()) * Vec3::random(&mut thread_rng());
+                let sphere_mat = Arc::new(Lambertian::new(albedo));
+                world.add(Box::new( Sphere::new( center, 0.2, sphere_mat ) ));
+
+            } else if choose_mat < 0.95  {
+                // metal
+                let albedo = Vec3::random_in_range(&mut thread_rng(), 0.5..=1.0);
+                let fuzz = thread_rng().gen_range(0.0..=0.5);
+                let sphere_mat = Arc::new(Metal::new(albedo, fuzz));
+                world.add(Box::new( Sphere::new( center, 0.2, sphere_mat ) ));
+            } else {
+                let sphere_mat = Arc::new(Dielectric::new(1.5));
+                world.add(Box::new( Sphere::new( center, 0.2, sphere_mat ) ));
+            }
+        }
+    }
+
+    let mat1 = Arc::new(Dielectric::new(1.5));
+    world.add(Box::new(Sphere::new( Vec3::new([0.0, 1.0, 0.0]), 1.0, mat1) ));
+
+    let mat2 = Arc::new(Lambertian::new(Vec3::new([0.4, 0.2, 0.1])));
+    world.add(Box::new(Sphere::new( Vec3::new([-4.0, 1.0, 0.0]), 1.0, mat2) ));
+
+    let mat3 = Arc::new(Metal::new(Vec3::new([0.7, 0.6, 0.5]), 0.0));
+    world.add(Box::new(Sphere::new( Vec3::new([4.0, 1.0, 0.0]), 1.0, mat3) ));
 
 
-    world.add(Box::new(Sphere::new(Vec3::new([0.8, -0.2, -1.0]), 0.3,
-                                   Arc::new(Metal::new(Vec3::new([0.6, 0.1, 0.7]), 0.0)) )));
-
-    world.add(Box::new(Sphere::new(Vec3::new([0.0, -100.5, -1.0]), 100.0,
-                                   Arc::new(Lambertian::new(Vec3::new([0.01, 0.63, 0.98]) )))));
-
-
-    let mut camera = Camera::new(ASPECT_RATIO, IMAGE_WIDTH, FOCAL_LENGTH,
-                                 VIEWPORT_HEIGHT, SAMPLES_PER_PIXEL, MAX_DEPTH);
+    let mut camera = Camera::new(ASPECT_RATIO, IMAGE_WIDTH, LOOK_FROM, LOOK_AT, VUP,
+                            cli.samples_per_pixel.unwrap_or(SAMPLES_PER_PIXEL), MAX_DEPTH, VFOV);
 
     // Render once
     unsafe {
@@ -210,8 +244,14 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
 
     }
 
-    camera.render_parallel(&world, fb, tex, dims);
+    if cli.no_parallel {
+        camera.render(&world, fb, tex, dims, cli.verbose);
+    } else {
+        camera.render_parallel(&world, fb, tex, dims);
+    }
+
     gl_window.swap_buffers().unwrap();
+    println!("Done Rendering!");
 
     event_loop.run(move |event, _, control_flow| {
 

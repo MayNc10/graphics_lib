@@ -5,6 +5,8 @@
 #![warn(missing_docs)]
 #![feature(let_chains)]
 //pub mod two_d;
+
+pub mod cli;
 pub mod three_d;
 pub mod matrix;
 mod must_use;
