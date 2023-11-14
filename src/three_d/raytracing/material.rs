@@ -1,4 +1,4 @@
-use rand::thread_rng;
+use rand::{random, Rng, thread_rng};
 use crate::three_d::raytracing::hit_record::{HitRecord, HitRecordNoMat};
 use crate::three_d::raytracing::ray::Ray;
 use crate::three_d::raytracing::vector::Vec3;
@@ -51,4 +51,43 @@ impl Material for Metal {
         if Vec3::dot(&scattered.direction(), &rec.normal) <= 0.0 { None }
         else { Some((self.albedo, scattered)) }
     }
+}
+
+pub struct Dielectric {
+    refrac_index: f32,
+}
+
+impl Dielectric {
+    pub fn new(refrac_index: f32) -> Dielectric { Dielectric { refrac_index } }
+
+    // Use Schlick approximation
+    fn reflectance(cosine: f32, ref_idx: f32) -> f32 {
+        let r0 = ((1.0 - ref_idx) / (1.0 + ref_idx)).powi(2);
+        r0 + (1.0 - r0) * (1.0 - cosine).powi(5)
+    }
+}
+
+impl Material for Dielectric {
+
+    fn scatter(&self, ray_in: Ray, rec: HitRecordNoMat) -> Option<(Vec3, Ray)> {
+        let attenuation = Vec3::new([1.0; 3]);
+        let refrac_ratio = if rec.front_face { 1.0 / self.refrac_index } else { self.refrac_index };
+
+        let unit_direction = ray_in.direction().unit();
+        let cos_theta = Vec3::dot(&(unit_direction * -1.0), &rec.normal).min(1.0);
+        let sin_theta = (1.0 - cos_theta.powi(2)).sqrt();
+
+        let direction = if refrac_ratio * sin_theta > 1.0
+        || Dielectric::reflectance(cos_theta, refrac_ratio) > random()
+        {
+            // cannot refract
+            Vec3::reflect(&unit_direction, &rec.normal)
+        } else {
+            // must refract
+            Vec3::refract(&unit_direction, &rec.normal, refrac_ratio)
+        };
+
+        Some((attenuation, Ray::new(rec.p, direction)))
+    }
+
 }

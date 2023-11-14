@@ -5,11 +5,15 @@ use crate::three_d::raytracing::ray::Ray;
 use crate::three_d::raytracing::vector::Vec3;
 
 pub struct HitRecord {
+    // Point that was hit at (p = r0 + r*t)
     pub p: Vec3,
+    // Normal of the hit
     pub normal: Vec3,
-    // This could be a reference or an Rc, but this makes it easier
+    // Material that was hit
     pub mat: Arc<dyn Material>,
+    // 't' at which the ray hit (using the ray form r0 + r*t)
     pub t: f32,
+    //
     pub front_face: bool,
 }
 

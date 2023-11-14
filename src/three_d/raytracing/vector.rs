@@ -1,12 +1,14 @@
+use std::ffi::OsString;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, Range, RangeInclusive, Sub};
+use clap::Parser;
 use rand::distributions::uniform::SampleRange;
 use rand::Rng;
 use rand::rngs::ThreadRng;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Vec3 {
-    data: [f32; 3]
+    pub data: [f32; 3]
 }
 
 const EPSILON: f32 = 1e-8;
@@ -46,6 +48,14 @@ impl Vec3 {
     pub fn dot(v1: &Vec3, v2: &Vec3) -> f32 {
         v1.x() * v2.x() + v1.y() * v2.y() + v1.z() * v2.z()
     }
+
+    pub fn cross(v1: &Vec3, v2: &Vec3) -> Vec3 {
+        Vec3::new([
+            v1.y() * v2.z() - v1.z() * v2.y(),
+            v1.z() * v2.x() - v1.x() * v2.z(),
+            v1.x() * v2.y() - v1.y() * v2.x(),
+        ])
+    }
     pub fn random(rng: &mut ThreadRng) -> Vec3 {
         Vec3 { data: rng.gen() }
     }
@@ -71,6 +81,13 @@ impl Vec3 {
 
     pub fn reflect(v: &Vec3, n: &Vec3) -> Vec3 {
         *v - *n * Vec3::dot(v, n) * 2
+    }
+
+    pub fn refract(uv: &Vec3, n: &Vec3, etai_over_etat: f32) -> Vec3 {
+        let cos_theta = Vec3::dot(&(*uv * -1.0), n).min(1.0);
+        let r_out_perp = (*uv + *n * cos_theta) * etai_over_etat;
+        let r_out_parallel = *n * -(1.0 - r_out_perp.length_squared()).abs().sqrt();
+        r_out_perp + r_out_parallel
     }
 }
 
@@ -146,5 +163,11 @@ impl Default for Vec3 {
 impl Sum for Vec3 {
     fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
         iter.fold(Vec3::default(), |a, b| a + b)
+    }
+}
+
+impl From<[f32; 3]> for Vec3 {
+    fn from(value: [f32; 3]) -> Self {
+        Vec3::new(value)
     }
 }

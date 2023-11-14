@@ -29,6 +29,17 @@ pub struct Camera {
     viewport_width: f32,
     viewport_height: f32,
     camera_center: Vec3,
+
+    vfov: f32,
+    look_from: Vec3, // Where are we looking from?
+    look_at: Vec3, // What point are we looking at?
+    vup: Vec3, // What point do we perceive as up?
+
+    // Camera basis vectors
+    u: Vec3,
+    v: Vec3,
+    w: Vec3,
+
     pixel00_loc: Vec3,
     pixel_delta_u: Vec3,
     pixel_delta_v: Vec3,
@@ -42,30 +53,41 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn new(aspect_ratio: f32, image_width: i32, focal_length: f32, viewport_height: f32, samples_per_pixel: i32, max_depth: i32) -> Camera {
+    pub fn new(aspect_ratio: f32, image_width: i32, look_from: Vec3, look_at: Vec3, vup: Vec3, samples_per_pixel: i32, max_depth: i32, vfov: f32) -> Camera {
         let image_height = (image_width as f32 / aspect_ratio) as i32;
+        let focal_length = (look_from - look_at).length();
+
+        let theta = vfov * std::f32::consts::PI / 180.0;
+        let h = (theta / 2.0).tan();
+        let viewport_height = 2.0 * h * focal_length;
         let viewport_width: f32 = viewport_height * image_width as f32 / image_height as f32;
-        let camera_center = Vec3::new([0.0, 0.0, 0.0]);
+
+        let camera_center = look_from;
+        let w = (look_from - look_at).unit();
+        let u = Vec3::cross(&vup, &w).unit();
+        let v = Vec3::cross(&w, &u);
 
         // Calculate the vectors across the horizontal and down the vertical viewport edges.
-        let viewport_u = Vec3::new([viewport_width as f32, 0.0, 0.0]);
-        let viewport_v = Vec3::new([0.0, viewport_height, 0.0]);
+        let viewport_u = u * viewport_width;
+        let viewport_v = v * viewport_height;
 
         // Calculate the horizontal and vertical delta vectors from pixel to pixel.
         let pixel_delta_u = viewport_u / image_width;
         let pixel_delta_v = viewport_v / image_height;
 
         // Calculate the location of the upper left pixel.
-        let viewport_upper_left = camera_center - Vec3::new([0.0, 0.0, focal_length]) - viewport_u/2 - viewport_v/2;
+        let viewport_upper_left = camera_center - (w * focal_length) - viewport_u / 2 - viewport_v / 2;
         let pixel00_loc = viewport_upper_left + (pixel_delta_u + pixel_delta_v) * 0.5;
 
         Camera { aspect_ratio, image_width, image_height, focal_length, viewport_width, viewport_height,
-            camera_center, pixel00_loc, pixel_delta_u, pixel_delta_v,
+            camera_center, vfov,
+            look_from, look_at, vup, u, v, w,
+            pixel00_loc, pixel_delta_u, pixel_delta_v,
             saved_dims: (0, 0),
             data: Box::new([]), samples_per_pixel, rng: thread_rng(), max_depth
         }
     }
-    pub fn render(&mut self, world: &dyn RTObject, fb: GLuint, tex: GLuint, dims: (i32, i32)) {
+    pub fn render(&mut self, world: &dyn RTObject, fb: GLuint, tex: GLuint, dims: (i32, i32), verbose: bool) {
         // Reallocate data
         if self.saved_dims != dims {
             self.data = vec![0.0_f32; (self.image_height * self.image_width * 4) as usize].into_boxed_slice();
@@ -77,13 +99,13 @@ impl Camera {
             let current_idx = (j * self.image_width) as f32;
             let max_idx = (self.image_height * self.image_width) as f32;
 
-            print!("\rProgress: {}%, idx: {} out of {}", current_idx/max_idx * 100.0, current_idx as u32, max_idx as u32);
+            if verbose { print!("\rProgress: {}%, idx: {} out of {}", current_idx/max_idx * 100.0, current_idx as u32, max_idx as u32); }
 
             for i in 0..self.image_width {
 
 
                 let mut pixel_color = Vec3::new([0.0; 3]);
-                for sample in 0..self.samples_per_pixel {
+                for _sample in 0..self.samples_per_pixel {
                     let r = self.get_ray(i, j);
                     pixel_color += Camera::ray_color(&r, world, &mut self.rng, self.max_depth);
                 }
@@ -241,4 +263,12 @@ impl Camera {
     }
 
     fn correct_gamma(x: f32) -> f32 { x.sqrt() }
+}
+
+impl Default for Camera {
+    fn default() -> Self {
+        Camera::new(16.0 / 9.0, 1400,
+                    Vec3 { data: [0.0, 0.0, -1.0] }, Vec3 { data: [0.0; 3] }, Vec3 { data: [0.0, 1.0, 0.0] },
+            10, 10, 90.0)
+    }
 }

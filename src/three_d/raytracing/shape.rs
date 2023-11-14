@@ -65,9 +65,9 @@ impl RTObject for Sphere {
         let sqrt_d = discriminant.sqrt();
 
         // Find the nearest root in an acceptable range
-        let root = (-half_b - sqrt_d) / a;
+        let mut root = (-half_b - sqrt_d) / a;
         if !ray_t.surrounds(root) {
-            let root = (-half_b + sqrt_d) / a;
+            root = (-half_b + sqrt_d) / a;
             if !ray_t.surrounds(root) {
                 return None;
             }
