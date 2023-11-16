@@ -3,6 +3,7 @@ pub mod bvh;
 pub mod camera;
 pub mod hit_record;
 pub mod interval;
+pub mod lights;
 pub mod material;
 pub mod opengl;
 pub mod ray;

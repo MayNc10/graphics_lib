@@ -1,5 +1,7 @@
+use std::ops::Add;
 use std::rc::Rc;
 use std::sync::Arc;
+use crate::three_d::raytracing::aabb::AABB;
 use crate::three_d::raytracing::hit_record::HitRecord;
 use crate::three_d::raytracing::interval::Interval;
 use crate::three_d::raytracing::material::{EmptyMaterial, Material};
@@ -9,16 +11,39 @@ use crate::three_d::raytracing::vector::Vec3;
 
 pub trait RTObject: Send + Sync {
     fn ray_intersects(&self, r: &Ray, ray_t: Interval) -> Option<HitRecord>;
+
+    fn bounding_box(&self) -> AABB;
+    fn clone_dyn(&self) -> Box<dyn RTObject>;
 }
 
+impl Clone for Box<dyn RTObject> {
+    fn clone(&self) -> Self {
+        self.clone_dyn()
+    }
+}
+
+#[derive(Clone)]
 pub struct RTObjectVec {
     objects: Vec<Box<dyn RTObject>>,
+    bbox: AABB
 }
 
 impl RTObjectVec {
-    pub fn new() -> RTObjectVec { RTObjectVec { objects: Vec::new() } }
-    pub fn clear(&mut self) { self.objects.clear(); }
-    pub fn add(&mut self, object: Box<dyn RTObject>) { self.objects.push(object); }
+    pub fn new() -> RTObjectVec { RTObjectVec { objects: Vec::new(), bbox: AABB::empty() } }
+    pub fn new_from_vec(objects: Vec<Box<dyn RTObject>>) -> RTObjectVec {
+        let mut rt = RTObjectVec { objects: Vec::new(), bbox: AABB::empty() };
+        for object in objects {
+            rt.bbox = AABB::new_from_boxes(rt.bbox, object.bounding_box());
+            rt.objects.push(object);
+        }
+        rt
+    }
+    pub fn clear(&mut self) { self.objects.clear(); self.bbox = AABB::empty(); }
+    pub fn add(&mut self, object: Box<dyn RTObject>) {
+        self.bbox = AABB::new_from_boxes(self.bbox, object.bounding_box());
+        self.objects.push(object);
+    }
+    pub fn objects(&self) -> &Vec<Box<dyn RTObject>> { &self.objects }
 }
 
 impl RTObject for RTObjectVec {
@@ -38,17 +63,25 @@ impl RTObject for RTObjectVec {
         if hit_anything { Some(final_rec) }
         else { None }
     }
+
+    fn bounding_box(&self) -> AABB { self.bbox }
+    fn clone_dyn(&self) -> Box<dyn RTObject> {
+        Box::new(self.clone())
+    }
 }
 
+#[derive(Clone)]
 pub struct Sphere {
     center: Vec3,
     radius: f32,
-    mat: Arc<dyn Material>
+    mat: Arc<dyn Material>,
+    bbox: AABB,
 }
 
 impl Sphere {
     pub fn new(center: Vec3, radius: f32, mat: Arc<dyn Material>) -> Sphere {
-        Sphere { center, radius, mat }
+        let r_vec = Vec3::new([radius; 3]);
+        Sphere { center, radius, mat, bbox: AABB::new_from_points(center - r_vec, center + r_vec) }
     }
 }
 
@@ -75,4 +108,184 @@ impl RTObject for Sphere {
 
         Some(HitRecord::new(root, r, &self.center, self.radius, self.mat.clone()))
     }
+
+    fn bounding_box(&self) -> AABB { self.bbox }
+    fn clone_dyn(&self) -> Box<dyn RTObject> {
+        Box::new(self.clone())
+    }
+}
+
+#[derive(Clone)]
+pub struct Quad {
+    q: Vec3,
+    u: Vec3,
+    v: Vec3,
+    normal: Vec3,
+    d: f32,
+    w: Vec3,
+
+    mat: Arc<dyn Material>,
+    bbox: AABB,
+}
+
+impl Quad {
+    pub fn new(q: Vec3, u: Vec3, v: Vec3, mat: Arc<dyn Material>) -> Quad {
+        let n = Vec3::cross(&u, &v);
+        Quad { q, u, v, normal: n.unit(), d: Vec3::dot(&n.unit(), &q), w: n / n.length_squared(), mat, bbox: Quad::get_bbox(q, u, v) }
+    }
+
+    fn get_bbox(q: Vec3, u: Vec3, v: Vec3) -> AABB {
+        AABB::new_from_points(q, q + u + v)
+    }
+
+    fn is_interior(a: f32, b: f32) -> bool {
+        !(a < 0.0 || 1.0 < a || b < 0.0 || 1.0 < b)
+    }
+}
+
+impl RTObject for Quad {
+    fn ray_intersects(&self, r: &Ray, ray_t: Interval) -> Option<HitRecord> {
+        let denom = Vec3::dot(&self.normal, &r.direction());
+
+        // No hit if the ray is parallel to the plane
+        if denom.abs() < 1e-8 { return None; }
+
+        let t = (self.d - Vec3::dot(&self.normal, &r.origin())) / denom;
+        if !ray_t.contains(t) { return None; }
+
+        // Determine if the hit point lies within the planar shape using its plane coordinates
+        let intersection = r.at(t);
+        let planar_hitpt_vec = intersection - self.q;
+        let alpha = Vec3::dot(&self.w, &Vec3::cross(&planar_hitpt_vec, &self.v));
+        let beta = Vec3::dot(&self.w, &Vec3::cross(&self.u, &planar_hitpt_vec));
+        if !Quad::is_interior(alpha, beta) { return None; }
+
+        let mut rec = HitRecord::blank_with_mat(self.mat.clone());
+        rec.t = t;
+        rec.p = intersection;
+        rec.set_face_normal(&r, &self.normal);
+        Some(rec)
+    }
+    fn bounding_box(&self) -> AABB { self.bbox }
+    fn clone_dyn(&self) -> Box<dyn RTObject> { Box::new(self.clone()) }
+}
+
+pub fn make_box(a: Vec3, b: Vec3, mat: Arc<dyn Material>) -> Box<dyn RTObject> {
+    let mut sides = RTObjectVec::new();
+
+    let min: Vec3 = [a.x().min(b.x()), a.y().min(b.y()), a.z().min(b.z())].into();
+    let max: Vec3 = [a.x().max(b.x()), a.y().max(b.y()), a.z().max(b.z())].into();
+
+    let dx = [max.x() - min.x(), 0.0, 0.0].into();
+    let dy = [0.0, max.y() - min.y(), 0.0].into();
+    let dz = [0.0, 0.0, max.z() - min.z()].into();
+
+    sides.add(Box::new(Quad::new([min.x(), min.y(), max.z()].into(), dx, dy, mat.clone()))); // front;
+    sides.add(Box::new(Quad::new([max.x(), min.y(), max.z()].into(), dz * -1.0, dy, mat.clone()))); // right;
+    sides.add(Box::new(Quad::new([max.x(), min.y(), min.z()].into(), dx * -1.0, dy, mat.clone()))); // back;
+    sides.add(Box::new(Quad::new([min.x(), min.y(), min.z()].into(), dz, dy, mat.clone()))); // left;
+    sides.add(Box::new(Quad::new([min.x(), max.y(), max.z()].into(), dx, dz * -1.0, mat.clone()))); // top;
+    sides.add(Box::new(Quad::new([min.x(), min.y(), min.z()].into(), dx, dz, mat.clone()))); // bottom;
+
+    Box::new(sides)
+}
+
+#[derive(Clone)]
+pub struct Translate {
+    object: Box<dyn RTObject>,
+    offset: Vec3,
+    bbox: AABB,
+}
+
+impl Translate {
+    pub fn new(object: Box<dyn RTObject>, offset: Vec3) -> Translate {
+        let bbox = object.bounding_box() + offset;
+        Translate { object, offset, bbox }
+    }
+}
+
+impl RTObject for Translate {
+    fn ray_intersects(&self, r: &Ray, ray_t: Interval) -> Option<HitRecord> {
+        let offset_r = Ray::new(r.origin() - self.offset, r.direction());
+        let mut rec = self.object.ray_intersects(&offset_r, ray_t);
+        if rec.is_none() { None }
+        else { rec.as_mut().unwrap().p += self.offset; rec }
+    }
+    fn bounding_box(&self) -> AABB { self.bbox }
+    fn clone_dyn(&self) -> Box<dyn RTObject> { Box::new(self.clone()) }
+}
+
+#[derive(Clone)]
+pub struct RotateY {
+    object: Box<dyn RTObject>,
+    sin_theta: f32,
+    cos_theta: f32,
+    bbox: AABB,
+}
+
+impl RotateY {
+    pub fn new(object: Box<dyn RTObject>, angle: f32) -> RotateY {
+        let radians = angle * std::f32::consts::PI / 180.0;
+        let (sin_theta, cos_theta) = radians.sin_cos();
+        let bbox = object.bounding_box();
+
+        let mut min = Vec3::new([f32::INFINITY; 3]);
+        let mut max = Vec3::new([-f32::INFINITY; 3]);
+
+        for i in 0..2 {
+            for j in 0..2 {
+                for k in 0..2 {
+                    let x = i as f32 * bbox.x.max + (1.0 - i as f32) * bbox.x.min;
+                    let y = j as f32 * bbox.y.max + (1.0 - j as f32 ) * bbox.y.min;
+                    let z = k as f32 * bbox.z.max + (1.0 - k as f32) * bbox.z.min;
+
+                    let newx = cos_theta * x + sin_theta * z;
+                    let newz = -sin_theta * x + cos_theta * z;
+
+                    let tester = [newx, y, newz];
+                    for c in 0..3 {
+                        min.data[c] = min.data[c].min(tester[c]);
+                        max.data[c] = max.data[c].max(tester[c]);
+                    }
+                }
+            }
+        }
+
+        RotateY { object, sin_theta, cos_theta, bbox: AABB::new_from_points(min, max) }
+    }
+}
+
+impl RTObject for RotateY {
+    fn ray_intersects(&self, r: &Ray, ray_t: Interval) -> Option<HitRecord> {
+        // Change from world to object space
+        let mut origin = r.origin();
+        let mut direction = r.direction();
+
+        origin.data[0] = self.cos_theta * r.origin().data[0] - self.sin_theta * r.origin().data[2];
+        origin.data[2] = self.sin_theta * r.origin().data[0] + self.cos_theta * r.origin().data[2];
+
+        direction.data[0] = self.cos_theta * r.direction().data[0] - self.sin_theta * r.direction().data[2];
+        direction.data[2] = self.sin_theta * r.direction().data[0] + self.cos_theta * r.direction().data[2];
+
+        let rotated = Ray::new(origin, direction);
+
+        let mut rec = self.object.ray_intersects(&rotated, ray_t);
+        if rec.is_none() { return None; }
+        let mut rec = rec.unwrap();
+
+        let mut p = rec.p;
+        p.data[0] = self.cos_theta * rec.p.data[0] + self.sin_theta * rec.p.data[2];
+        p.data[2] = -self.sin_theta * rec.p.data[0] + self.cos_theta * rec.p.data[2];
+
+        let mut normal = rec.normal;
+        normal.data[0] = self.cos_theta * rec.normal.data[0] + self.sin_theta * rec.normal.data[2];
+        normal.data[2] = -self.sin_theta * rec.normal.data[0] + self.cos_theta * rec.normal.data[2];
+
+        rec.p = p;
+        rec.normal = normal;
+
+        Some(rec)
+    }
+    fn bounding_box(&self) -> AABB { self.bbox }
+    fn clone_dyn(&self) -> Box<dyn RTObject> { Box::new(self.clone()) }
 }

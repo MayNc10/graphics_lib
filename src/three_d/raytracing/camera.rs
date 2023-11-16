@@ -8,6 +8,7 @@ use rand::rngs::ThreadRng;
 use rand::{Rng, thread_rng};
 use rayon::prelude::*;
 use crate::three_d::raytracing::interval::Interval;
+use crate::three_d::raytracing::opengl;
 use crate::three_d::raytracing::ray::Ray;
 use crate::three_d::raytracing::shape::RTObject;
 use crate::three_d::raytracing::vector::Vec3;
@@ -50,10 +51,14 @@ pub struct Camera {
     samples_per_pixel: i32,
     rng: ThreadRng,
     max_depth: i32,
+
+    background: Vec3,
 }
 
 impl Camera {
-    pub fn new(aspect_ratio: f32, image_width: i32, look_from: Vec3, look_at: Vec3, vup: Vec3, samples_per_pixel: i32, max_depth: i32, vfov: f32) -> Camera {
+    pub fn new(aspect_ratio: f32, image_width: i32, look_from: Vec3, look_at: Vec3, vup: Vec3, samples_per_pixel: i32, max_depth: i32, vfov: f32, background: Vec3)
+        -> Camera
+    {
         let image_height = (image_width as f32 / aspect_ratio) as i32;
         let focal_length = (look_from - look_at).length();
 
@@ -84,10 +89,11 @@ impl Camera {
             look_from, look_at, vup, u, v, w,
             pixel00_loc, pixel_delta_u, pixel_delta_v,
             saved_dims: (0, 0),
-            data: Box::new([]), samples_per_pixel, rng: thread_rng(), max_depth
+            data: Box::new([]), samples_per_pixel, rng: thread_rng(), max_depth,
+            background
         }
     }
-    pub fn render(&mut self, world: &dyn RTObject, fb: GLuint, tex: GLuint, dims: (i32, i32), verbose: bool) {
+    pub fn render(&mut self, world: &dyn RTObject, dims: (i32, i32), verbose: bool, fb: &mut opengl::Framebuffer) {
         // Reallocate data
         if self.saved_dims != dims {
             self.data = vec![0.0_f32; (self.image_height * self.image_width * 4) as usize].into_boxed_slice();
@@ -107,7 +113,7 @@ impl Camera {
                 let mut pixel_color = Vec3::new([0.0; 3]);
                 for _sample in 0..self.samples_per_pixel {
                     let r = self.get_ray(i, j);
-                    pixel_color += Camera::ray_color(&r, world, &mut self.rng, self.max_depth);
+                    pixel_color += Camera::ray_color(&r, world, &mut self.rng, self.max_depth, self.background);
                 }
 
                 pixel_color /= self.samples_per_pixel;
@@ -124,28 +130,10 @@ impl Camera {
             }
         }
 
-        unsafe {
-            gl::BindTexture(gl::TEXTURE_2D, tex);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as GLint);
-
-            //gl::PixelStorei(gl::PACK_ALIGNMENT, 1);
-            gl::TexSubImage2D(gl::TEXTURE_2D, 0, 0, 0,
-                              self.image_width, self.image_height, gl::RGBA, gl::FLOAT,
-                              self.data.as_ptr() as *const _);
-
-            gl::BindFramebuffer(gl::FRAMEBUFFER, fb);
-
-            gl::BindFramebuffer(gl::READ_FRAMEBUFFER, fb);
-            gl::BindFramebuffer(gl::DRAW_FRAMEBUFFER, 0);
-
-            gl::BlitFramebuffer(0, 0, self.image_width, self.image_height, 0, 0, dims.0, dims.1,
-                                gl::COLOR_BUFFER_BIT, gl::LINEAR);
-
-        }
+        unsafe { fb.draw(self.image_width, self.image_height, dims, self.data.as_ptr()); }
     }
 
-    pub fn render_parallel(&mut self, world: &dyn RTObject, fb: GLuint, tex: GLuint, dims: (i32, i32)) {
+    pub fn render_parallel(&mut self, world: &dyn RTObject, dims: (i32, i32), verbose: bool, fb: &mut opengl::Framebuffer) {
         // Reallocate data
         if self.saved_dims != dims {
             self.data = vec![0.0_f32; (self.image_height * self.image_width * 4) as usize].into_boxed_slice();
@@ -164,7 +152,7 @@ impl Camera {
             let samples_iter = (0..self.samples_per_pixel).into_par_iter();
             let mut pixel_color: Vec3 = samples_iter.map(|_| {
                 let r = Camera::get_ray_cmethod(i, j, self.pixel00_loc, self.pixel_delta_u, self.pixel_delta_v, self.camera_center);
-                Camera::ray_color_parallel(&r, arc_world.clone(), self.max_depth)
+                Camera::ray_color_parallel(&r, arc_world.clone(), self.max_depth, self.background)
             }).sum();
 
             pixel_color /= self.samples_per_pixel;
@@ -183,25 +171,7 @@ impl Camera {
             }
         });
 
-        unsafe {
-            gl::BindTexture(gl::TEXTURE_2D, tex);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as GLint);
-
-            //gl::PixelStorei(gl::PACK_ALIGNMENT, 1);
-            gl::TexSubImage2D(gl::TEXTURE_2D, 0, 0, 0,
-                              self.image_width, self.image_height, gl::RGBA, gl::FLOAT,
-                              self.data.as_ptr() as *const _);
-
-            gl::BindFramebuffer(gl::FRAMEBUFFER, fb);
-
-            gl::BindFramebuffer(gl::READ_FRAMEBUFFER, fb);
-            gl::BindFramebuffer(gl::DRAW_FRAMEBUFFER, 0);
-
-            gl::BlitFramebuffer(0, 0, self.image_width, self.image_height, 0, 0, dims.0, dims.1,
-                                gl::COLOR_BUFFER_BIT, gl::LINEAR);
-
-        }
+        unsafe { fb.draw(self.image_width, self.image_height, dims, self.data.as_ptr()); }
     }
 
 
@@ -237,7 +207,7 @@ impl Camera {
         pixel_delta_u * px + pixel_delta_v * py
     }
 
-    fn ray_color(r: &Ray, world: &dyn RTObject, rng: &mut ThreadRng, depth: i32) -> Vec3 {
+    fn ray_color(r: &Ray, world: &dyn RTObject, rng: &mut ThreadRng, depth: i32, background: Vec3) -> Vec3 {
         // Don't gather more light if we've reached the depth
         if depth <= 0 { return Vec3::new([0.0; 3]) }
 
@@ -246,20 +216,17 @@ impl Camera {
         if let Some(rec) = rec_wrap {
             return {
                 if let Some((attenuation, scattered)) = rec.mat.scatter(*r, rec.self_without_mat()) {
-                    attenuation * Camera::ray_color(&scattered, world, rng, depth - 1)
-                } else { Vec3::new([0.0; 3]) }
+                    attenuation * Camera::ray_color(&scattered, world, rng, depth - 1, background) + rec.mat.emitted()
+                } else { rec.mat.emitted() }
             };
         }
 
-        let unit = r.direction().unit();
-        let a = 0.5 * (unit.y() + 1.0);
-
-        Vec3::new([1.0; 3]) * (1.0 - a) + Vec3::new([0.5, 0.7, 1.0]) * a
+        background
     }
 
-    fn ray_color_parallel(r: &Ray, world: Arc<&dyn RTObject>, depth: i32) -> Vec3 {
+    fn ray_color_parallel(r: &Ray, world: Arc<&dyn RTObject>, depth: i32, background: Vec3) -> Vec3 {
         let mut rng = thread_rng();
-        Camera::ray_color(r, *world, &mut rng, depth)
+        Camera::ray_color(r, *world, &mut rng, depth, background)
     }
 
     fn correct_gamma(x: f32) -> f32 { x.sqrt() }
@@ -269,6 +236,6 @@ impl Default for Camera {
     fn default() -> Self {
         Camera::new(16.0 / 9.0, 1400,
                     Vec3 { data: [0.0, 0.0, -1.0] }, Vec3 { data: [0.0; 3] }, Vec3 { data: [0.0, 1.0, 0.0] },
-            10, 10, 90.0)
+            10, 10, 90.0, Vec3::default())
     }
 }

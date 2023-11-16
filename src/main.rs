@@ -18,24 +18,28 @@ use graphics_lib::cli::Cli;
 use graphics_lib::three_d::shaders::{*, self};
 use graphics_lib::three_d;
 use graphics_lib::matrix::*;
+use graphics_lib::three_d::raytracing::bvh::BVHNode;
 use graphics_lib::three_d::raytracing::camera::Camera;
+use graphics_lib::three_d::raytracing::lights::DiffuseLight;
 use graphics_lib::three_d::raytracing::material::{Dielectric, Lambertian, Metal};
 use graphics_lib::three_d::raytracing::opengl;
-use graphics_lib::three_d::raytracing::shape::{RTObjectVec, Sphere};
+use graphics_lib::three_d::raytracing::shape::{make_box, Quad, RotateY, RTObjectVec, Sphere, Translate};
 use graphics_lib::three_d::raytracing::vector::Vec3;
 
 // Set a target for fps (don't run faster or slower than this)
-const TARGET_FPS: u64 = 10;
+const TARGET_FPS: u64 = 100;
 const ASPECT_RATIO: f32 = 16.0 / 9.0;
 const IMAGE_WIDTH: i32 = 1200;
 const IMAGE_HEIGHT: i32 = (IMAGE_WIDTH as f32 / ASPECT_RATIO) as i32;
 const FOCAL_LENGTH: f32 = 1.0;
-const VFOV: f32 = 20.0;
-const LOOK_FROM: Vec3 = Vec3 { data: [13.0, 2.0, 3.0] };
-const LOOK_AT: Vec3 = Vec3 { data: [0.0; 3] };
+const VFOV: f32 = 40.0;
+const LOOK_FROM: Vec3 = Vec3 { data: [278.0, 278.0, -800.0] };
+const LOOK_AT: Vec3 = Vec3 { data: [278.0, 278.0, 0.0] };
 const VUP: Vec3 = Vec3 { data: [0.0, 1.0, 0.0] };
-const SAMPLES_PER_PIXEL: i32 = 10;
-const MAX_DEPTH: i32 = 10;
+const SAMPLES_PER_PIXEL: i32 = 15000;
+const MAX_DEPTH: i32 = 400;
+
+const BACKGROUND: Vec3 = Vec3 { data: [0.0; 3] };
 
 lazy_static! {
     static ref MEDIA_PATH_BASE: &'static Path = Path::new("media");
@@ -158,7 +162,7 @@ fn demo_2d(event_loop: EventLoop<()>, display: Display) {
 }
 */
 
-fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::PossiblyCurrent, glutin::window::Window>) {
+fn demo_rt_circles(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::PossiblyCurrent, glutin::window::Window>) {
     let cli = Cli::parse();
 
     let dims_ps = gl_window.window().inner_size();
@@ -212,11 +216,14 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     let mat3 = Arc::new(Metal::new(Vec3::new([0.7, 0.6, 0.5]), 0.0));
     world.add(Box::new(Sphere::new( Vec3::new([4.0, 1.0, 0.0]), 1.0, mat3) ));
 
+    let world = BVHNode::from(world);
+    //let world = RTObjectVec::new_from_vec(vec![Box::new(world)]);
+
 
     let mut camera = Camera::new(cli.aspect_ratio.unwrap_or(ASPECT_RATIO), image_width,
                                  LOOK_FROM, LOOK_AT, VUP,
                             cli.samples_per_pixel.unwrap_or(SAMPLES_PER_PIXEL), cli.max_depth.unwrap_or(MAX_DEPTH),
-                                 cli.vfov.unwrap_or(VFOV));
+                                 cli.vfov.unwrap_or(VFOV), BACKGROUND);
 
     // Render once
     unsafe {
@@ -291,6 +298,133 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
         }
     });
 }
+
+fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::PossiblyCurrent, glutin::window::Window>) {
+    let cli = Cli::parse();
+
+    let dims_ps = gl_window.window().inner_size();
+    let dims = (dims_ps.width as i32, dims_ps.height as i32);
+
+    let image_width = cli.image_width.unwrap_or(IMAGE_WIDTH);
+    let image_height = (image_width as f32 / cli.aspect_ratio.unwrap_or(ASPECT_RATIO)) as i32;
+
+    let mut fb = opengl::Framebuffer::new(image_width, image_height);
+
+    let mut t: f32 = 0.0;
+    let delta: f32 = 0.02;
+
+    let mut start_time = std::time::Instant::now();
+
+    let mut world = RTObjectVec::new();
+
+    let red = Arc::new(Lambertian::new([0.65, 0.05, 0.05].into()));
+    let white = Arc::new(Lambertian::new([0.73, 0.73, 0.73].into()));
+    let green = Arc::new(Lambertian::new([0.12, 0.45, 0.15].into()));
+    let light = Arc::new(DiffuseLight::new([15.0; 3].into()));
+
+
+    world.add(Box::new(Quad::new([555.0, 0.0, 0.0].into(), [0.0, 555.0, 0.0].into(), [0.0, 0.0, 555.0].into(), green)));
+    world.add(Box::new(Quad::new([0.0; 3].into(), [0.0, 555.0, 0.0].into(), [0.0, 0.0, 555.0].into(), red)));
+    world.add(Box::new(Quad::new([343.0, 554.0, 332.0].into(), [-130.0, 0.0, 0.0].into(), [0.0, 0.0, -105.0].into(), light)));
+    world.add(Box::new(Quad::new([0.0; 3].into(), [555.0, 0.0, 0.0].into(), [0.0, 0.0, 555.0].into(), white.clone())));
+    world.add(Box::new(Quad::new([555.0; 3].into(), [-555.0, 0.0, 0.0].into(), [0.0, 0.0, -555.0].into(), white.clone())));
+    world.add(Box::new(Quad::new([0.0, 0.0, 555.0].into(), [555.0, 0.0, 0.0].into(), [0.0, 555.0, 0.0].into(), white.clone())));
+
+    let box1 =make_box([0.0;3].into(), [165.0, 330.0, 165.0].into(), white.clone());
+    let box1 = Box::new(RotateY::new(box1, 15.0));
+    let box1 = Box::new(Translate::new(box1, [265.0, 0.0, 295.0].into()));
+    world.add(box1);
+
+    let box2 = make_box([0.0; 3].into(), [165.0; 3].into(), white.clone());
+    let box2 = Box::new(RotateY::new(box2, -18.0));
+    let box2 = Box::new(Translate::new(box2, [130.0, 0.0, 65.0].into()));
+    world.add(box2);
+
+    let world = BVHNode::from(world);
+
+
+    let mut camera = Camera::new(cli.aspect_ratio.unwrap_or(ASPECT_RATIO), image_width,
+                                 LOOK_FROM, LOOK_AT, VUP,
+                                 cli.samples_per_pixel.unwrap_or(SAMPLES_PER_PIXEL), cli.max_depth.unwrap_or(MAX_DEPTH),
+                                 cli.vfov.unwrap_or(VFOV), BACKGROUND);
+
+    // Render once
+    unsafe {
+        gl::BindBuffer(gl::FRAMEBUFFER, 0);
+        gl::ClearColor(0.0, 0.0, 0.0, 0.0);
+        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+
+    }
+
+    if cli.no_parallel {
+        camera.render(&world, dims, cli.verbose, &mut fb);
+    } else {
+        camera.render_parallel(&world, dims, cli.verbose, &mut fb);
+    }
+
+    gl_window.swap_buffers().unwrap();
+    println!("Done Rendering!");
+
+    event_loop.run(move |event, _, control_flow| {
+
+        use glutin::event::{Event, WindowEvent};
+        use glutin::event_loop::ControlFlow;
+        *control_flow = ControlFlow::Wait;
+        match event {
+            Event::LoopDestroyed => return,
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::CloseRequested => {
+                    *control_flow = ControlFlow::Exit
+                },
+                WindowEvent::MouseInput { .. } => {
+                    gl_window.swap_buffers().unwrap();
+                },
+                _ => (),
+            },
+            Event::RedrawRequested(_) => {
+                let elapsed_time = std::time::Instant::now().duration_since(start_time).as_millis() as u64;
+
+                // How long should we wait for to run at 60 fps?
+                let wait_millis = match 1000 / TARGET_FPS >= elapsed_time {
+                    true => 1000 / TARGET_FPS - elapsed_time,
+                    false => 0
+                };
+
+                if wait_millis == 0 {
+                    // Update time
+                    t += delta;
+
+                    //gl_window.swap_buffers().unwrap();
+
+                    start_time = std::time::Instant::now();
+                }
+
+            },
+            _ => (),
+        }
+
+        match *control_flow {
+            ControlFlow::Exit => (),
+            _ => {
+                gl_window.window().request_redraw();
+
+                let elapsed_time = std::time::Instant::now().duration_since(start_time).as_millis() as u64;
+
+                // How long should we wait for to run at 60 fps?
+                let wait_millis = match 1000 / TARGET_FPS >= elapsed_time {
+                    true => 1000 / TARGET_FPS - elapsed_time,
+                    false => 0
+                };
+
+                let new_inst = start_time + std::time::Duration::from_millis(wait_millis);
+                // Wait that long
+                *control_flow =  ControlFlow::WaitUntil(new_inst);
+                //println!("Hitting fps goal!");
+            }
+        }
+    });
+}
+
 
 fn shape_path(name: &str) -> String {
     String::from(MEDIA_PATH_BASE.join(Path::new(name)).to_str().unwrap())

@@ -5,6 +5,7 @@ use clap::Parser;
 use rand::distributions::uniform::SampleRange;
 use rand::Rng;
 use rand::rngs::ThreadRng;
+use crate::three_d::raytracing::aabb::AABB;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Vec3 {
@@ -169,5 +170,12 @@ impl Sum for Vec3 {
 impl From<[f32; 3]> for Vec3 {
     fn from(value: [f32; 3]) -> Self {
         Vec3::new(value)
+    }
+}
+
+impl Add<AABB> for Vec3 {
+    type Output = AABB;
+    fn add(self, rhs: AABB) -> Self::Output {
+        AABB::new(self.x() + rhs.x, self.y() + rhs.y, self.z() + rhs.z)
     }
 }

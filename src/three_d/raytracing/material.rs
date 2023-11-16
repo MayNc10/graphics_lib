@@ -1,10 +1,13 @@
 use rand::{random, Rng, thread_rng};
+use crate::three_d::raytracing::aabb::AABB;
 use crate::three_d::raytracing::hit_record::{HitRecord, HitRecordNoMat};
 use crate::three_d::raytracing::ray::Ray;
+use crate::three_d::raytracing::shape::RTObject;
 use crate::three_d::raytracing::vector::Vec3;
 
 pub trait Material: Send + Sync {
     fn scatter(&self, ray_in: Ray, rec: HitRecordNoMat) -> Option<(Vec3, Ray)>;
+    fn emitted(&self) -> Vec3 { Vec3::default() }
 }
 
 pub struct EmptyMaterial {}
