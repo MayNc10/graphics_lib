@@ -20,6 +20,7 @@ use graphics_lib::three_d;
 use graphics_lib::matrix::*;
 use graphics_lib::three_d::raytracing::camera::Camera;
 use graphics_lib::three_d::raytracing::material::{Dielectric, Lambertian, Metal};
+use graphics_lib::three_d::raytracing::opengl;
 use graphics_lib::three_d::raytracing::shape::{RTObjectVec, Sphere};
 use graphics_lib::three_d::raytracing::vector::Vec3;
 
@@ -158,36 +159,15 @@ fn demo_2d(event_loop: EventLoop<()>, display: Display) {
 */
 
 fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::PossiblyCurrent, glutin::window::Window>) {
-    unsafe {
-        //gl::Enable(gl::DEPTH_TEST);
-        gl::Enable( gl::DEBUG_OUTPUT );
-        //gl::DepthFunc(gl::LESS);
-    }
-
     let cli = Cli::parse();
 
-    let mut dims_ps = gl_window.window().inner_size();
-    let mut dims = (dims_ps.width as i32, dims_ps.height as i32);
+    let dims_ps = gl_window.window().inner_size();
+    let dims = (dims_ps.width as i32, dims_ps.height as i32);
 
-    let mut fb = 0;
-    let mut tex = 0;
+    let image_width = cli.image_width.unwrap_or(IMAGE_WIDTH);
+    let image_height = (image_width as f32 / cli.aspect_ratio.unwrap_or(ASPECT_RATIO)) as i32;
 
-    unsafe {
-        gl::GenFramebuffers(1, &mut fb);
-        gl::BindFramebuffer(gl::FRAMEBUFFER, fb);
-
-        // - position color buffer
-        gl::GenTextures(1, &mut tex);
-        gl::BindTexture(gl::TEXTURE_2D, tex);
-
-        gl::TexStorage2D(gl::TEXTURE_2D, 1, gl::RGBA32F, IMAGE_WIDTH, IMAGE_HEIGHT);
-
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
-        gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::TEXTURE_2D, tex, 0);
-
-        gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
-    }
+    let mut fb = opengl::Framebuffer::new(image_width, image_height);
 
     let mut t: f32 = 0.0;
     let delta: f32 = 0.02;
@@ -233,8 +213,10 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     world.add(Box::new(Sphere::new( Vec3::new([4.0, 1.0, 0.0]), 1.0, mat3) ));
 
 
-    let mut camera = Camera::new(ASPECT_RATIO, IMAGE_WIDTH, LOOK_FROM, LOOK_AT, VUP,
-                            cli.samples_per_pixel.unwrap_or(SAMPLES_PER_PIXEL), MAX_DEPTH, VFOV);
+    let mut camera = Camera::new(cli.aspect_ratio.unwrap_or(ASPECT_RATIO), image_width,
+                                 LOOK_FROM, LOOK_AT, VUP,
+                            cli.samples_per_pixel.unwrap_or(SAMPLES_PER_PIXEL), cli.max_depth.unwrap_or(MAX_DEPTH),
+                                 cli.vfov.unwrap_or(VFOV));
 
     // Render once
     unsafe {
@@ -245,9 +227,9 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     }
 
     if cli.no_parallel {
-        camera.render(&world, fb, tex, dims, cli.verbose);
+        camera.render(&world, dims, cli.verbose, &mut fb);
     } else {
-        camera.render_parallel(&world, fb, tex, dims);
+        camera.render_parallel(&world, dims, cli.verbose, &mut fb);
     }
 
     gl_window.swap_buffers().unwrap();
