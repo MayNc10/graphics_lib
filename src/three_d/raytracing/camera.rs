@@ -216,7 +216,10 @@ impl Camera {
         if let Some(rec) = rec_wrap {
             return {
                 if let Some((attenuation, scattered)) = rec.mat.scatter(*r, rec.self_without_mat()) {
-                    attenuation * Camera::ray_color(&scattered, world, rng, depth - 1, background) + rec.mat.emitted()
+                    let scattering_pdf = rec.mat.scattering_pdf(*r, &rec, scattered);
+                    let pdf = scattering_pdf;
+                    let color_from_scatter = (attenuation * scattering_pdf * Camera::ray_color(&scattered, world, rng, depth - 1, background)) / pdf;
+                    color_from_scatter + rec.mat.emitted()
                 } else { rec.mat.emitted() }
             };
         }

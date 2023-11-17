@@ -36,8 +36,8 @@ const VFOV: f32 = 40.0;
 const LOOK_FROM: Vec3 = Vec3 { data: [278.0, 278.0, -800.0] };
 const LOOK_AT: Vec3 = Vec3 { data: [278.0, 278.0, 0.0] };
 const VUP: Vec3 = Vec3 { data: [0.0, 1.0, 0.0] };
-const SAMPLES_PER_PIXEL: i32 = 15000;
-const MAX_DEPTH: i32 = 400;
+const SAMPLES_PER_PIXEL: i32 = 100;
+const MAX_DEPTH: i32 = 50;
 
 const BACKGROUND: Vec3 = Vec3 { data: [0.0; 3] };
 

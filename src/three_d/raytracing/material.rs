@@ -1,6 +1,7 @@
 use rand::{random, Rng, thread_rng};
 use crate::three_d::raytracing::aabb::AABB;
 use crate::three_d::raytracing::hit_record::{HitRecord, HitRecordNoMat};
+use crate::three_d::raytracing::onb::ONB;
 use crate::three_d::raytracing::ray::Ray;
 use crate::three_d::raytracing::shape::RTObject;
 use crate::three_d::raytracing::vector::Vec3;
@@ -8,6 +9,7 @@ use crate::three_d::raytracing::vector::Vec3;
 pub trait Material: Send + Sync {
     fn scatter(&self, ray_in: Ray, rec: HitRecordNoMat) -> Option<(Vec3, Ray)>;
     fn emitted(&self) -> Vec3 { Vec3::default() }
+    fn scattering_pdf(&self, ray_in: Ray, rec: &HitRecord, scattered: Ray) -> f32 { 0.0 }
 }
 
 pub struct EmptyMaterial {}
@@ -27,6 +29,8 @@ impl Lambertian {
 
 impl Material for Lambertian {
     fn scatter(&self, ray_in: Ray, rec: HitRecordNoMat) -> Option<(Vec3, Ray)> {
+        let uvw = ONB::build_from_w(rec.normal);
+
         let mut scatter_direction = rec.normal + Vec3::random_in_unit_sphere(&mut thread_rng()).to_unit();
 
         // Catch degenerate scatter direction
@@ -35,6 +39,11 @@ impl Material for Lambertian {
         }
 
         Some((self.albedo, Ray::new(rec.p, scatter_direction)))
+    }
+
+    fn scattering_pdf(&self, ray_in: Ray, rec: &HitRecord, scattered: Ray) -> f32 {
+        let cos_theta = Vec3::dot(&rec.normal, &scattered.direction().unit());
+        if cos_theta < 0.0 { 0.0 } else { cos_theta / std::f32::consts::PI }
     }
 }
 
