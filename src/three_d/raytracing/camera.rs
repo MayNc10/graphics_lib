@@ -156,8 +156,8 @@ impl Camera {
                 let r = Camera::get_ray_cmethod(i, j, self.pixel00_loc, self.pixel_delta_u, self.pixel_delta_v, self.camera_center);
                 let color = Camera::ray_color_parallel(&r, arc_world.clone(), arc_lights.clone(), self.max_depth, self.background);
                 let r = if color.x() == color.x() { color.x() } else { 0.0 };
-                let g = if color.x() == color.x() { color.x() } else { 0.0 };
-                let b = if color.x() == color.x() { color.x() } else { 0.0 };
+                let g = if color.y() == color.y() { color.y() } else { 0.0 };
+                let b = if color.z() == color.z() { color.z() } else { 0.0 };
                 [r, g, b].into()
             }).sum();
 
