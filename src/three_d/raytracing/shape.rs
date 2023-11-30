@@ -1,19 +1,36 @@
 use std::ops::Add;
 use std::rc::Rc;
 use std::sync::Arc;
+use rand::{random, Rng, thread_rng};
 use crate::three_d::raytracing::aabb::AABB;
 use crate::three_d::raytracing::hit_record::HitRecord;
 use crate::three_d::raytracing::interval::Interval;
 use crate::three_d::raytracing::material::{EmptyMaterial, Material};
+use crate::three_d::raytracing::onb::ONB;
 use crate::three_d::raytracing::ray::Ray;
 use crate::three_d::raytracing::vector::Vec3;
 
 
+/// A trait representing a raytracing object
+/// A raytracing object is a 3-dimensional object that provides methods for computing ray bounces and lighting
 pub trait RTObject: Send + Sync {
+    /// Compute whether the given ray in the specified interval intersects with the object
+    /// If the ray intersects the object, this method should return a HitRecord with information about the intersection
+    /// Otherwise, this value should return None
     fn ray_intersects(&self, r: &Ray, ray_t: Interval) -> Option<HitRecord>;
-
+    /// Compute a bounding box that contains the object
     fn bounding_box(&self) -> AABB;
+    /// Clone the object into a Box
     fn clone_dyn(&self) -> Box<dyn RTObject>;
+    /// Compute the probability that a ray starting from a certain point with a certain direction would be reflected by this object
+    /// This method is not required
+    fn pdf_value(&self, o: Vec3, v: Vec3) -> f32 { 0.0 }
+    /// Compute a random ray bouncing off the object, given the origin of the vector
+    /// This should take into account the geometry of the object to match the real probabilities of reflecting in different directions
+    /// This method is not required
+    fn random(&self, o: Vec3) -> Vec3 {
+        [1.0, 0.0, 0.0].into()
+    }
 }
 
 impl Clone for Box<dyn RTObject> {
@@ -22,6 +39,7 @@ impl Clone for Box<dyn RTObject> {
     }
 }
 
+/// A struct representing a list of raytracing objects
 #[derive(Clone)]
 pub struct RTObjectVec {
     objects: Vec<Box<dyn RTObject>>,
@@ -29,7 +47,9 @@ pub struct RTObjectVec {
 }
 
 impl RTObjectVec {
+    /// Create a new, empty object vector
     pub fn new() -> RTObjectVec { RTObjectVec { objects: Vec::new(), bbox: AABB::empty() } }
+    /// Create a new object vector, given a vector of objects
     pub fn new_from_vec(objects: Vec<Box<dyn RTObject>>) -> RTObjectVec {
         let mut rt = RTObjectVec { objects: Vec::new(), bbox: AABB::empty() };
         for object in objects {
@@ -38,11 +58,14 @@ impl RTObjectVec {
         }
         rt
     }
+    /// Clear the vector
     pub fn clear(&mut self) { self.objects.clear(); self.bbox = AABB::empty(); }
+    /// Add a new object to the vector
     pub fn add(&mut self, object: Box<dyn RTObject>) {
         self.bbox = AABB::new_from_boxes(self.bbox, object.bounding_box());
         self.objects.push(object);
     }
+    /// Get the list of objects contained in the vector
     pub fn objects(&self) -> &Vec<Box<dyn RTObject>> { &self.objects }
 }
 
@@ -68,8 +91,23 @@ impl RTObject for RTObjectVec {
     fn clone_dyn(&self) -> Box<dyn RTObject> {
         Box::new(self.clone())
     }
+    fn pdf_value(&self, o: Vec3, v: Vec3) -> f32 {
+        let weight = 1.0 / (self.objects.len() as f32);
+        let mut sum = 0.0;
+
+        for object in &self.objects {
+            sum += weight * object.pdf_value(o, v);
+        }
+
+        sum
+    }
+    fn random(&self, o: Vec3) -> Vec3 {
+        if self.objects.len() == 0 { Vec3::default() }
+        else { self.objects[thread_rng().gen_range(0..self.objects.len())].random(o) }
+    }
 }
 
+/// A struct represeting a sphere
 #[derive(Clone)]
 pub struct Sphere {
     center: Vec3,
@@ -79,9 +117,22 @@ pub struct Sphere {
 }
 
 impl Sphere {
+    /// Create a new sphere, given a center point, a radius, and a material
     pub fn new(center: Vec3, radius: f32, mat: Arc<dyn Material>) -> Sphere {
         let r_vec = Vec3::new([radius; 3]);
         Sphere { center, radius, mat, bbox: AABB::new_from_points(center - r_vec, center + r_vec) }
+    }
+
+    fn random_to_sphere(radius: f32, distance_squared: f32) -> Vec3 {
+        let r1 = random::<f32>();
+        let r2 = random::<f32>();
+        let z = 1.0 + r2 * ((1.0 - radius * radius / distance_squared).sqrt() - 1.0);
+
+        let phi = 2.0 * std::f32::consts::PI * r1;
+        let x = phi.cos() * (1.0 - z.powi(2)).sqrt();
+        let y = phi.sin() * (1.0 - z.powi(2)).sqrt();
+
+        [x, y, z].into()
     }
 }
 
@@ -113,8 +164,24 @@ impl RTObject for Sphere {
     fn clone_dyn(&self) -> Box<dyn RTObject> {
         Box::new(self.clone())
     }
+    fn pdf_value(&self, o: Vec3, v: Vec3) -> f32 {
+        let hit_rec = self.ray_intersects(&Ray::new(o, v), Interval::new(0.001, f32::INFINITY));
+        if hit_rec.is_none() { return 0.0 }
+
+        let cos_theta_max = (1.0 - self.radius * self.radius / (self.center - o).length_squared()).sqrt();
+        let solid_angle = 2.0 * std::f32::consts::PI * (1.0 - cos_theta_max);
+
+        1.0 / solid_angle
+    }
+    fn random(&self, o: Vec3) -> Vec3 {
+        let direction = self.center - o;
+        let distance_squared = direction.length_squared();
+        let uvw = ONB::build_from_w(direction);
+        uvw.local_from_vector(Sphere::random_to_sphere(self.radius, distance_squared))
+    }
 }
 
+/// A struct representing a quadrilateral in 3-dimensional space
 #[derive(Clone)]
 pub struct Quad {
     q: Vec3,
@@ -123,21 +190,22 @@ pub struct Quad {
     normal: Vec3,
     d: f32,
     w: Vec3,
+    area: f32,
 
     mat: Arc<dyn Material>,
     bbox: AABB,
 }
 
 impl Quad {
+    /// Create a new quadrilateral, given one corner q, two translations, u and v, and a material
     pub fn new(q: Vec3, u: Vec3, v: Vec3, mat: Arc<dyn Material>) -> Quad {
         let n = Vec3::cross(&u, &v);
-        Quad { q, u, v, normal: n.unit(), d: Vec3::dot(&n.unit(), &q), w: n / n.length_squared(), mat, bbox: Quad::get_bbox(q, u, v) }
+        Quad { q, u, v, normal: n.unit(), d: Vec3::dot(&n.unit(), &q), w: n / n.length_squared(), area: n.length(), mat, bbox: Quad::get_bbox(q, u, v) }
     }
 
     fn get_bbox(q: Vec3, u: Vec3, v: Vec3) -> AABB {
         AABB::new_from_points(q, q + u + v)
     }
-
     fn is_interior(a: f32, b: f32) -> bool {
         !(a < 0.0 || 1.0 < a || b < 0.0 || 1.0 < b)
     }
@@ -168,8 +236,23 @@ impl RTObject for Quad {
     }
     fn bounding_box(&self) -> AABB { self.bbox }
     fn clone_dyn(&self) -> Box<dyn RTObject> { Box::new(self.clone()) }
+    fn pdf_value(&self, origin: Vec3, v: Vec3) -> f32 {
+        let rec = self.ray_intersects(&Ray::new(origin, v), Interval::new(0.001, f32::INFINITY));
+        if rec.is_none() { return 0.0; }
+        let rec = rec.unwrap();
+
+        let distance_squared = rec.t * rec.t * v.length_squared();
+        let cosine = (Vec3::dot(&v, &rec.normal) / v.length()).abs();
+
+        distance_squared / (cosine * self.area)
+    }
+    fn random(&self, origin: Vec3) -> Vec3 {
+        let p = self.q + self.u * random::<f32>() + self.v * random::<f32>();
+        p - origin
+    }
 }
 
+/// Create a 3-dimension box, given two points of opposite corners
 pub fn make_box(a: Vec3, b: Vec3, mat: Arc<dyn Material>) -> Box<dyn RTObject> {
     let mut sides = RTObjectVec::new();
 
@@ -190,6 +273,8 @@ pub fn make_box(a: Vec3, b: Vec3, mat: Arc<dyn Material>) -> Box<dyn RTObject> {
     Box::new(sides)
 }
 
+/// A struct representing a translation of an object
+/// The struct consumes a base object and computes ray bounces as if the base object had been translated a certain amount
 #[derive(Clone)]
 pub struct Translate {
     object: Box<dyn RTObject>,
@@ -198,6 +283,7 @@ pub struct Translate {
 }
 
 impl Translate {
+    /// Create a new translation, given a base object and an offset vector
     pub fn new(object: Box<dyn RTObject>, offset: Vec3) -> Translate {
         let bbox = object.bounding_box() + offset;
         Translate { object, offset, bbox }
@@ -215,6 +301,8 @@ impl RTObject for Translate {
     fn clone_dyn(&self) -> Box<dyn RTObject> { Box::new(self.clone()) }
 }
 
+/// A struct representing an object that has been rotated around its y axis
+/// This struct consumes a base object and calculates ray bounces for it as if it were rotated a certain amount around its y axis
 #[derive(Clone)]
 pub struct RotateY {
     object: Box<dyn RTObject>,
@@ -224,6 +312,7 @@ pub struct RotateY {
 }
 
 impl RotateY {
+    /// Create a new Y rotation, given the base option and the angle (in degrees)
     pub fn new(object: Box<dyn RTObject>, angle: f32) -> RotateY {
         let radians = angle * std::f32::consts::PI / 180.0;
         let (sin_theta, cos_theta) = radians.sin_cos();

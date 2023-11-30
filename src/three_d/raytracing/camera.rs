@@ -9,19 +9,14 @@ use rand::{Rng, thread_rng};
 use rayon::prelude::*;
 use crate::three_d::raytracing::interval::Interval;
 use crate::three_d::raytracing::opengl;
+use crate::three_d::raytracing::pdf::{CosinePDF, MixturePDF, PDF, RTObjectPDF};
 use crate::three_d::raytracing::ray::Ray;
-use crate::three_d::raytracing::shape::RTObject;
+use crate::three_d::raytracing::shape::{RTObject, RTObjectVec};
 use crate::three_d::raytracing::vector::Vec3;
 
 static INTENSITY: Interval = Interval { min: 0.0, max: 0.999 };
 
-// helper function
-fn flatten<T: Copy, const N: usize>(data: &[[T; N]]) -> &[T] {
-    unsafe {
-        from_raw_parts(data.as_ptr() as *const _, data.len() * N)
-    }
-}
-
+/// A struct representing a camera into the scene
 pub struct Camera {
     aspect_ratio: f32,
     image_width: i32,
@@ -56,6 +51,7 @@ pub struct Camera {
 }
 
 impl Camera {
+    /// Create a new camera
     pub fn new(aspect_ratio: f32, image_width: i32, look_from: Vec3, look_at: Vec3, vup: Vec3, samples_per_pixel: i32, max_depth: i32, vfov: f32, background: Vec3)
         -> Camera
     {
@@ -93,7 +89,9 @@ impl Camera {
             background
         }
     }
-    pub fn render(&mut self, world: &dyn RTObject, dims: (i32, i32), verbose: bool, fb: &mut opengl::Framebuffer) {
+    /// Render a scene, given the world of objects, the list of lights in the scene, the image dimensions, whether the program should produce debug output, and the framebuffer
+    /// This method renders the scene on a single thread, making it slower than the parallel method
+    pub fn render(&mut self, world: &dyn RTObject, lights: Option<&dyn RTObject>, dims: (i32, i32), verbose: bool, fb: &mut opengl::Framebuffer) {
         // Reallocate data
         if self.saved_dims != dims {
             self.data = vec![0.0_f32; (self.image_height * self.image_width * 4) as usize].into_boxed_slice();
@@ -113,7 +111,7 @@ impl Camera {
                 let mut pixel_color = Vec3::new([0.0; 3]);
                 for _sample in 0..self.samples_per_pixel {
                     let r = self.get_ray(i, j);
-                    pixel_color += Camera::ray_color(&r, world, &mut self.rng, self.max_depth, self.background);
+                    pixel_color += Camera::ray_color(&r, world, lights, &mut self.rng, self.max_depth, self.background);
                 }
 
                 pixel_color /= self.samples_per_pixel;
@@ -125,15 +123,18 @@ impl Camera {
                 //let mut vals = unsafe { *data.index(j as usize, i as usize, self.image_width as usize) };
                 let idx = (j * self.image_width + i) * 4;
                 let vals = &mut self.data[idx as usize ..];
-                vals[0..3].copy_from_slice(&pixel_color.data());
+                vals[0..3].copy_from_slice(&pixel_color.data);
                 vals[3] = 1.0;
             }
         }
 
         unsafe { fb.draw(self.image_width, self.image_height, dims, self.data.as_ptr()); }
     }
+    /// Render a scene, given the world of objects, the list of lights in the scene, the image dimensions, whether the program should produce debug output, and the framebuffer
+    /// This method renders the scene in parallel on the CPU, making it faster than the singlethreaded method
+    /// It is recommended that this method be used for performance reasons
 
-    pub fn render_parallel(&mut self, world: &dyn RTObject, dims: (i32, i32), verbose: bool, fb: &mut opengl::Framebuffer) {
+    pub fn render_parallel(&mut self, world: &dyn RTObject, lights: Option<&dyn RTObject>, dims: (i32, i32), _verbose: bool, fb: &mut opengl::Framebuffer) {
         // Reallocate data
         if self.saved_dims != dims {
             self.data = vec![0.0_f32; (self.image_height * self.image_width * 4) as usize].into_boxed_slice();
@@ -141,6 +142,7 @@ impl Camera {
         }
         // Make world cross-thread
         let arc_world = Arc::new(world);
+        let arc_lights = Arc::new(lights);
         let data_ptr = self.data.as_mut_ptr() as usize;
 
         let idx_iter = (0..(self.image_height * self.image_width)).into_par_iter();
@@ -152,7 +154,11 @@ impl Camera {
             let samples_iter = (0..self.samples_per_pixel).into_par_iter();
             let mut pixel_color: Vec3 = samples_iter.map(|_| {
                 let r = Camera::get_ray_cmethod(i, j, self.pixel00_loc, self.pixel_delta_u, self.pixel_delta_v, self.camera_center);
-                Camera::ray_color_parallel(&r, arc_world.clone(), self.max_depth, self.background)
+                let color = Camera::ray_color_parallel(&r, arc_world.clone(), arc_lights.clone(), self.max_depth, self.background);
+                let r = if color.x() == color.x() { color.x() } else { 0.0 };
+                let g = if color.x() == color.x() { color.x() } else { 0.0 };
+                let b = if color.x() == color.x() { color.x() } else { 0.0 };
+                [r, g, b].into()
             }).sum();
 
             pixel_color /= self.samples_per_pixel;
@@ -207,7 +213,7 @@ impl Camera {
         pixel_delta_u * px + pixel_delta_v * py
     }
 
-    fn ray_color(r: &Ray, world: &dyn RTObject, rng: &mut ThreadRng, depth: i32, background: Vec3) -> Vec3 {
+    fn ray_color(r: &Ray, world: &dyn RTObject, lights: Option<&dyn RTObject>, rng: &mut ThreadRng, depth: i32, background: Vec3) -> Vec3 {
         // Don't gather more light if we've reached the depth
         if depth <= 0 { return Vec3::new([0.0; 3]) }
 
@@ -215,21 +221,39 @@ impl Camera {
         let rec_wrap = world.ray_intersects(r, Interval::new(0.001, f32::INFINITY));
         if let Some(rec) = rec_wrap {
             return {
-                if let Some((attenuation, scattered)) = rec.mat.scatter(*r, rec.self_without_mat()) {
-                    let scattering_pdf = rec.mat.scattering_pdf(*r, &rec, scattered);
-                    let pdf = scattering_pdf;
-                    let color_from_scatter = (attenuation * scattering_pdf * Camera::ray_color(&scattered, world, rng, depth - 1, background)) / pdf;
-                    color_from_scatter + rec.mat.emitted()
-                } else { rec.mat.emitted() }
-            };
+                if let Some((attenuation, scattered, pdf)) = rec.mat.scatter(*r, rec.self_without_mat()) {
+                    // skip this pdf work for specular objects
+                    if pdf.is_none() {
+                        attenuation * Camera::ray_color(&scattered, world, lights, rng, depth - 1, background)
+                    } else if lights.is_none() {
+                        attenuation * Camera::ray_color(&scattered, world, lights, rng, depth - 1, background)
+                    }
+                    else {
+                        let p1 = RTObjectPDF::new(lights.unwrap().clone_dyn(), rec.p);
+                        let p2 = CosinePDF::new(rec.normal);
+                        let mixed_pdf = MixturePDF::new(Box::new(p1), Box::new(p2));
+
+                        let scattered = Ray::new(rec.p, mixed_pdf.generate());
+                        let pdf_val = mixed_pdf.value(scattered.direction());
+
+                        let scattering_pdf = rec.mat.scattering_pdf(*r, &rec, scattered);
+
+                        let sample_color = Camera::ray_color(&scattered, world, lights, rng, depth - 1, background);
+                        let color_from_scatter = sample_color * attenuation * scattering_pdf / pdf_val;
+
+                        color_from_scatter
+                    }
+
+                } else { [0.0; 3].into() }
+            } + rec.mat.emitted(*r, rec.self_without_mat(), 0.0, 0.0, rec.p);
         }
 
         background
     }
 
-    fn ray_color_parallel(r: &Ray, world: Arc<&dyn RTObject>, depth: i32, background: Vec3) -> Vec3 {
+    fn ray_color_parallel(r: &Ray, world: Arc<&dyn RTObject>, lights: Arc<Option<&dyn RTObject>>, depth: i32, background: Vec3) -> Vec3 {
         let mut rng = thread_rng();
-        Camera::ray_color(r, *world, &mut rng, depth, background)
+        Camera::ray_color(r, *world, *lights, &mut rng, depth, background)
     }
 
     fn correct_gamma(x: f32) -> f32 { x.sqrt() }

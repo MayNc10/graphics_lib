@@ -1,24 +1,32 @@
 use std::ops::Add;
-use crate::three_d::raytracing::bvh::BVHNode;
 use crate::three_d::raytracing::interval::Interval;
 use crate::three_d::raytracing::ray::Ray;
 use crate::three_d::raytracing::vector::Vec3;
 
+/// A struct representing an axis-aligned bounding box
+/// This is used to speed up ray intersection calculations by rejecting rays faster
+/// Calculating intersections with a bounding box is much faster than for an arbitrary raytracing object, so this allows the code to reject more rays faster
 #[derive(Copy, Clone)]
 pub struct AABB {
+    /// The interval along the x-axis that the bounding box occupies
     pub x: Interval,
+    /// The interval along the y-axis that the bounding box occupies
     pub y: Interval,
+    /// The interval along the z-axis that the bounding box occupies
     pub z: Interval,
 }
 
 impl AABB {
+    /// Create an empty bounding box
     pub fn empty() -> AABB {
         AABB { x: Interval::empty(), y: Interval::empty(), z: Interval::empty()}
     }
+    /// Create a bounding box given three intervals along each of the axes
     pub fn new(x: Interval, y: Interval, z: Interval) -> AABB {
         AABB {x, y, z}
     }
 
+    /// Create a bounding box given two opposite points of the box
     pub fn new_from_points(a: Vec3, b: Vec3) -> AABB {
         // a and b are the extrema of the bounding box
         AABB {
@@ -28,6 +36,7 @@ impl AABB {
         }
     }
 
+    /// Create a bounding box from two smaller bounding boxes
     pub fn new_from_boxes(b1: AABB, b2: AABB) -> AABB {
         AABB {
             x: Interval::new_from_intervals(b1.x, b2.x),
@@ -36,6 +45,7 @@ impl AABB {
         }
     }
 
+    /// Return an AABB that has no side narrower than some delta, padding if necessary
     pub fn pad(&self) -> AABB {
         // Return an AABB that has no side narrower than some delta, padding if necessary
         let delta = 0.0001;
@@ -46,10 +56,12 @@ impl AABB {
         AABB::new(new_x, new_y, new_z)
     }
 
+    /// Turn a number specifying a dimensional axis into the bounding box interval along that axis
     pub fn axis(&self, n: u32) -> Interval {
         if n == 0 { self.x } else if n == 1 { self.y } else { self.z }
     }
 
+    /// Determine whether a given ray in a given interval insersects the box
     pub fn hit(&self, r: &Ray, mut ray_t: Interval) -> bool {
         for axis in 0..3 {
             let inv_d = 1.0 / r.direction().data[axis];

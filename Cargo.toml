@@ -2,6 +2,12 @@
 name = "graphics-lib"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "A simple library providing 3D rendering and raytracing capabilities"
+homepage = "https://github.com/MayNc10/graphics_lib/tree/use-gl"
+repository = "https://github.com/MayNc10/graphics_lib/tree/use-gl"
+readme = "README.md"
+keywords = ["graphics", "raytracing"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

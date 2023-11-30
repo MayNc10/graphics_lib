@@ -7,49 +7,60 @@ use rand::Rng;
 use rand::rngs::ThreadRng;
 use crate::three_d::raytracing::aabb::AABB;
 
+/// A struct representing a three-dimensional vector
 #[derive(Copy, Clone, Debug)]
 pub struct Vec3 {
+    /// The x, y, and z components of the vector
     pub data: [f32; 3]
 }
 
 const EPSILON: f32 = 1e-8;
 
 impl Vec3 {
+    /// Create a new vector from the given array
     pub fn new(data: [f32; 3]) -> Vec3 { Vec3 { data } }
-    pub fn data(&self) -> [f32; 3] { self.data }
 
+    /// Compute the length of the vector
     pub fn length(&self) -> f32 {
         f32::sqrt(self.data[0].powi(2) + self.data[1].powi(2) + self.data[2].powi(2))
     }
+    /// Get the unit vector with the same direction as the input vector
     pub fn unit(&self) -> Vec3 {
         *self / self.length()
     }
-    pub fn to_unit(self) -> Vec3 { self / self.length() }
 
+    /// Get the value of the x-component of the vector
     pub fn x(&self) -> f32 { self.data[0] }
+    /// Get the value of the y-component of the vector
     pub fn y(&self) -> f32 { self.data[1] }
+    /// Get the value of the z-component of the vector
     pub fn z(&self) -> f32 { self.data[2] }
 
+    /// Apply a function to each of the components of the vector
     pub fn for_each(&mut self, func: &fn(f32) -> f32) {
         self.data[0] = func(self.data[0]);
         self.data[1] = func(self.data[1]);
         self.data[2] = func(self.data[2]);
     }
 
+    /// Compute the squared length of the vector
     pub fn length_squared(&self) -> f32 {
         Vec3::dot(self, self)
     }
 
+    /// Check whether all the values of the vector are within 1e-8 of 0
     pub fn near_zero(&self) -> bool {
         self.data[0].abs() < EPSILON && self.data[1].abs() < EPSILON && self.data[2].abs() < EPSILON
     }
 }
 
 impl Vec3 {
+    /// Compute the dot product of two vectors
     pub fn dot(v1: &Vec3, v2: &Vec3) -> f32 {
         v1.x() * v2.x() + v1.y() * v2.y() + v1.z() * v2.z()
     }
 
+    /// Compute the cross product of two vectors
     pub fn cross(v1: &Vec3, v2: &Vec3) -> Vec3 {
         Vec3::new([
             v1.y() * v2.z() - v1.z() * v2.y(),
@@ -57,10 +68,12 @@ impl Vec3 {
             v1.x() * v2.y() - v1.y() * v2.x(),
         ])
     }
+    /// Generate a vector of random values
     pub fn random(rng: &mut ThreadRng) -> Vec3 {
         Vec3 { data: rng.gen() }
     }
 
+    /// Generate a vector with random values within the given range
     pub fn random_in_range<R>(rng: &mut ThreadRng, range: R) -> Vec3
     where
         R: SampleRange<f32> + Clone
@@ -68,6 +81,8 @@ impl Vec3 {
         Vec3 { data: [rng.gen_range(range.clone()), rng.gen_range(range.clone()), rng.gen_range(range)] }
     }
 
+    /// Generate a random vector within the unit circle
+    /// This vector is not necessarily on the unit circle, just inside it
     pub fn random_in_unit_sphere(rng: &mut ThreadRng) -> Vec3 {
         loop {
             let v = Vec3::random_in_range(rng, -1.0..=1.0);
@@ -75,15 +90,18 @@ impl Vec3 {
         }
     }
 
+    /// Generate a random vector in a hemisphere in the direction of the normal vector
     pub fn random_on_hemisphere(rng: &mut ThreadRng, normal: &Vec3) -> Vec3 {
-        let v = Vec3::random_in_unit_sphere(rng).to_unit();
+        let v = Vec3::random_in_unit_sphere(rng).unit();
         if Vec3::dot(&v, normal) > 0.0 { v } else { v * -1 }
     }
 
+    /// Reflect off of a surface, given the incoming vector and the normal vector of the surface
     pub fn reflect(v: &Vec3, n: &Vec3) -> Vec3 {
         *v - *n * Vec3::dot(v, n) * 2
     }
 
+    /// Refract through a material, given the incoming vector, the normal vector of the surface, and the refraction ratio
     pub fn refract(uv: &Vec3, n: &Vec3, etai_over_etat: f32) -> Vec3 {
         let cos_theta = Vec3::dot(&(*uv * -1.0), n).min(1.0);
         let r_out_perp = (*uv + *n * cos_theta) * etai_over_etat;

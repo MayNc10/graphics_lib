@@ -6,6 +6,11 @@ use crate::three_d::raytracing::interval::Interval;
 use crate::three_d::raytracing::ray::Ray;
 use crate::three_d::raytracing::shape::{RTObject, RTObjectVec};
 
+/// A struct representing a BVHNode
+/// A BVH renders raytracing objects faster by splitting itself into two halves, each with their own bounding boxes
+/// This means that when calculating lighting, many rays can be rejected because they don't intersect the half that a certain object is in
+/// A BVH with more than two base objects creates a tree structure, with each half being its own BVHNode
+/// This creates a binary tree of smaller and smaller regions, which makes rendering faster because more rays can be rejected based on bounding-box collisions
 #[derive(Clone)]
 pub struct BVHNode {
     left: Box<dyn RTObject>,
@@ -14,6 +19,7 @@ pub struct BVHNode {
 }
 
 impl BVHNode {
+    /// Create a new BVHNode from a list of raytracing objects, and indices to specify what part of the vector should be used
     pub fn new(src_objects: &Vec<Box<dyn RTObject>>, start: usize, end: usize) -> BVHNode {
         let mut objects = (*src_objects).clone();
         let axis = thread_rng().gen_range(0..3);

@@ -23,6 +23,7 @@ use graphics_lib::three_d::raytracing::camera::Camera;
 use graphics_lib::three_d::raytracing::lights::DiffuseLight;
 use graphics_lib::three_d::raytracing::material::{Dielectric, Lambertian, Metal};
 use graphics_lib::three_d::raytracing::opengl;
+use graphics_lib::three_d::raytracing::pdf::SpherePDF;
 use graphics_lib::three_d::raytracing::shape::{make_box, Quad, RotateY, RTObjectVec, Sphere, Translate};
 use graphics_lib::three_d::raytracing::vector::Vec3;
 
@@ -36,8 +37,8 @@ const VFOV: f32 = 40.0;
 const LOOK_FROM: Vec3 = Vec3 { data: [278.0, 278.0, -800.0] };
 const LOOK_AT: Vec3 = Vec3 { data: [278.0, 278.0, 0.0] };
 const VUP: Vec3 = Vec3 { data: [0.0, 1.0, 0.0] };
-const SAMPLES_PER_PIXEL: i32 = 100;
-const MAX_DEPTH: i32 = 50;
+const SAMPLES_PER_PIXEL: i32 = 1000;
+const MAX_DEPTH: i32 = 100;
 
 const BACKGROUND: Vec3 = Vec3 { data: [0.0; 3] };
 
@@ -61,6 +62,7 @@ fn main() {
     gl::load_with(|symbol| gl_window.get_proc_address(symbol));
 
     //demo_3d(event_loop, gl_window);
+    //demo_rt_circles(event_loop, gl_window);
     demo_rt(event_loop, gl_window);
 }
 
@@ -221,9 +223,9 @@ fn demo_rt_circles(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<
 
 
     let mut camera = Camera::new(cli.aspect_ratio.unwrap_or(ASPECT_RATIO), image_width,
-                                 LOOK_FROM, LOOK_AT, VUP,
+                                 [13.0, 2.0, 3.0].into(), [0.0; 3].into(), VUP,
                             cli.samples_per_pixel.unwrap_or(SAMPLES_PER_PIXEL), cli.max_depth.unwrap_or(MAX_DEPTH),
-                                 cli.vfov.unwrap_or(VFOV), BACKGROUND);
+                                 cli.vfov.unwrap_or(20.0), [0.5, 0.7, 1.0].into());
 
     // Render once
     unsafe {
@@ -234,9 +236,9 @@ fn demo_rt_circles(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<
     }
 
     if cli.no_parallel {
-        camera.render(&world, dims, cli.verbose, &mut fb);
+        camera.render(&world, None, dims, cli.verbose, &mut fb);
     } else {
-        camera.render_parallel(&world, dims, cli.verbose, &mut fb);
+        camera.render_parallel(&world, None, dims, cli.verbose, &mut fb);
     }
 
     gl_window.swap_buffers().unwrap();
@@ -325,7 +327,7 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
 
     world.add(Box::new(Quad::new([555.0, 0.0, 0.0].into(), [0.0, 555.0, 0.0].into(), [0.0, 0.0, 555.0].into(), green)));
     world.add(Box::new(Quad::new([0.0; 3].into(), [0.0, 555.0, 0.0].into(), [0.0, 0.0, 555.0].into(), red)));
-    world.add(Box::new(Quad::new([343.0, 554.0, 332.0].into(), [-130.0, 0.0, 0.0].into(), [0.0, 0.0, -105.0].into(), light)));
+    world.add(Box::new(Quad::new([343.0, 554.0, 332.0].into(), [-130.0, 0.0, 0.0].into(), [0.0, 0.0, -105.0].into(), light.clone())));
     world.add(Box::new(Quad::new([0.0; 3].into(), [555.0, 0.0, 0.0].into(), [0.0, 0.0, 555.0].into(), white.clone())));
     world.add(Box::new(Quad::new([555.0; 3].into(), [-555.0, 0.0, 0.0].into(), [0.0, 0.0, -555.0].into(), white.clone())));
     world.add(Box::new(Quad::new([0.0, 0.0, 555.0].into(), [555.0, 0.0, 0.0].into(), [0.0, 555.0, 0.0].into(), white.clone())));
@@ -335,10 +337,15 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     let box1 = Box::new(Translate::new(box1, [265.0, 0.0, 295.0].into()));
     world.add(box1);
 
-    let box2 = make_box([0.0; 3].into(), [165.0; 3].into(), white.clone());
-    let box2 = Box::new(RotateY::new(box2, -18.0));
-    let box2 = Box::new(Translate::new(box2, [130.0, 0.0, 65.0].into()));
-    world.add(box2);
+    //let box2 = make_box([0.0; 3].into(), [165.0; 3].into(), white.clone());
+    //let box2 = Box::new(RotateY::new(box2, -18.0));
+    //let box2 = Box::new(Translate::new(box2, [130.0, 0.0, 65.0].into()));
+    //world.add(box2);
+    let glass = Arc::new(Dielectric::new(1.5));
+    world.add(Box::new(Sphere::new([190.0, 90.0, 190.0].into(), 90.0, glass)));
+
+    let mut lights = RTObjectVec::new();
+    lights.add(Box::new(Quad::new([343.0, 554.0, 332.0].into(), [-130.0, 0.0, 0.0].into(), [0.0, 0.0, -105.0].into(), light)));
 
     let world = BVHNode::from(world);
 
@@ -357,9 +364,9 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     }
 
     if cli.no_parallel {
-        camera.render(&world, dims, cli.verbose, &mut fb);
+        camera.render(&world, Some(&lights), dims, cli.verbose, &mut fb);
     } else {
-        camera.render_parallel(&world, dims, cli.verbose, &mut fb);
+        camera.render_parallel(&world, Some(&lights), dims, cli.verbose, &mut fb);
     }
 
     gl_window.swap_buffers().unwrap();
