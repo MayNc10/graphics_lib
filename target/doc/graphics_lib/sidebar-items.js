@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":[["matrix","A 4x4 matrix implementation, with functions for matrix multiplication."],["three_d","The three_d module provides support for loading and rendering 3D models."]]};
+window.SIDEBAR_ITEMS = {"mod":["cli","matrix","three_d"]};

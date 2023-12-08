@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["make_box"],"struct":["Quad","RTObjectVec","RotateY","Sphere","Translate"],"trait":["RTObject"]};

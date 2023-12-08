@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["Dielectric","EmptyMaterial","Lambertian","Metal"],"trait":["Material"]};
