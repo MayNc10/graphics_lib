@@ -3,7 +3,6 @@ use std::{fs, collections::HashMap, path::Path};
 
 use super::*;
 
-// FIXME: Remove this!
 /// FIXME: Remove this!
 pub const MAT: Material = Material {
     ambient_color: [0.2, 0.0, 0.0],

@@ -10,6 +10,7 @@ use crate::three_d::raytracing::onb::ONB;
 use crate::three_d::raytracing::ray::Ray;
 use crate::three_d::raytracing::vector::Vec3;
 
+pub mod polyhedron;
 
 /// A trait representing a raytracing object
 /// A raytracing object is a 3-dimensional object that provides methods for computing ray bounces and lighting
@@ -198,13 +199,13 @@ pub struct Quad {
 
 impl Quad {
     /// Create a new quadrilateral, given one corner q, two translations, u and v, and a material
-    pub fn new(q: Vec3, u: Vec3, v: Vec3, mat: Arc<dyn Material>) -> Quad {
-        let n = Vec3::cross(&u, &v);
+    pub fn new(q: Vec3, u: Vec3, v: Vec3, mat: Arc<dyn Material>, invert_normal: bool) -> Quad {
+        let n = Vec3::cross(&u, &v) * if invert_normal { -1 } else { 1 };
         Quad { q, u, v, normal: n.unit(), d: Vec3::dot(&n.unit(), &q), w: n / n.length_squared(), area: n.length(), mat, bbox: Quad::get_bbox(q, u, v) }
     }
 
     fn get_bbox(q: Vec3, u: Vec3, v: Vec3) -> AABB {
-        AABB::new_from_points(q, q + u + v)
+        AABB::new_from_points(q, q + u + v).pad()
     }
     fn is_interior(a: f32, b: f32) -> bool {
         !(a < 0.0 || 1.0 < a || b < 0.0 || 1.0 < b)
@@ -263,12 +264,12 @@ pub fn make_box(a: Vec3, b: Vec3, mat: Arc<dyn Material>) -> Box<dyn RTObject> {
     let dy = [0.0, max.y() - min.y(), 0.0].into();
     let dz = [0.0, 0.0, max.z() - min.z()].into();
 
-    sides.add(Box::new(Quad::new([min.x(), min.y(), max.z()].into(), dx, dy, mat.clone()))); // front;
-    sides.add(Box::new(Quad::new([max.x(), min.y(), max.z()].into(), dz * -1.0, dy, mat.clone()))); // right;
-    sides.add(Box::new(Quad::new([max.x(), min.y(), min.z()].into(), dx * -1.0, dy, mat.clone()))); // back;
-    sides.add(Box::new(Quad::new([min.x(), min.y(), min.z()].into(), dz, dy, mat.clone()))); // left;
-    sides.add(Box::new(Quad::new([min.x(), max.y(), max.z()].into(), dx, dz * -1.0, mat.clone()))); // top;
-    sides.add(Box::new(Quad::new([min.x(), min.y(), min.z()].into(), dx, dz, mat.clone()))); // bottom;
+    sides.add(Box::new(Quad::new([min.x(), min.y(), max.z()].into(), dx, dy, mat.clone(), false))); // front;
+    sides.add(Box::new(Quad::new([max.x(), min.y(), max.z()].into(), dz * -1.0, dy, mat.clone(), false))); // right;
+    sides.add(Box::new(Quad::new([max.x(), min.y(), min.z()].into(), dx * -1.0, dy, mat.clone(), false))); // back;
+    sides.add(Box::new(Quad::new([min.x(), min.y(), min.z()].into(), dz, dy, mat.clone(), false))); // left;
+    sides.add(Box::new(Quad::new([min.x(), max.y(), max.z()].into(), dx, dz * -1.0, mat.clone(), false))); // top;
+    sides.add(Box::new(Quad::new([min.x(), min.y(), min.z()].into(), dx, dz, mat.clone(), false))); // bottom;
 
     Box::new(sides)
 }
@@ -378,3 +379,67 @@ impl RTObject for RotateY {
     fn bounding_box(&self) -> AABB { self.bbox }
     fn clone_dyn(&self) -> Box<dyn RTObject> { Box::new(self.clone()) }
 }
+
+#[derive(Clone)]
+pub struct Tri {
+    points: [Vec3; 3],
+    normal: Vec3,
+
+    mat: Arc<dyn Material>,
+}
+
+impl Tri {
+    pub fn new(points: [Vec3; 3], normal: Vec3, mat: Arc<dyn Material>,) -> Tri {
+        Tri { points, normal, mat }
+    }
+}
+
+impl RTObject for Tri {
+    // from https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/ray-triangle-intersection-geometric-solution.html
+    fn ray_intersects(&self, r: &Ray, ray_t: Interval) -> Option<HitRecord> {
+        //println!("Intersecting triangle");
+
+        let d = -Vec3::dot(&self.points[0], &self.normal);
+        let t = -(Vec3::dot(&self.normal, &r.origin()) + d) / Vec3::dot(&self.normal, &r.direction());
+        if !ray_t.contains(t) { return None; }
+
+        let p = r.at(t);
+
+        let edge0 = self.points[1] - self.points[0];
+        let edge1 = self.points[2] - self.points[1];
+        let edge2 = self.points[0] - self.points[2];
+
+        let c0 = p - self.points[0];
+        let c1 = p - self.points[1];
+        let c2 = p - self.points[2];
+
+        if Vec3::dot(&self.normal, &Vec3::cross(&edge0, &c0)) > 0.0
+        && Vec3::dot(&self.normal, &Vec3::cross(&edge1, &c1)) > 0.0
+        && Vec3::dot(&self.normal, &Vec3::cross(&edge2, &c2)) > 0.0 {
+            let mut rec = HitRecord::blank_with_mat(self.mat.clone());
+            rec.t = t;
+            rec.p = p;
+            rec.set_face_normal(&r, &self.normal);
+            Some(rec)
+        }
+        else { None }
+    }
+    fn bounding_box(&self) -> AABB {
+        let max_x = self.points.iter().map(|p| p.x()).fold(f32::NEG_INFINITY, |a, b| a.max(b));
+        let min_x = self.points.iter().map(|p| p.x()).fold(f32::INFINITY, |a, b| a.min(b));
+
+        let max_y = self.points.iter().map(|p| p.y()).fold(f32::NEG_INFINITY, |a, b| a.max(b));
+        let min_y = self.points.iter().map(|p| p.y()).fold(f32::INFINITY, |a, b| a.min(b));
+
+        let max_z = self.points.iter().map(|p| p.z()).fold(f32::NEG_INFINITY, |a, b| a.max(b));
+        let min_z = self.points.iter().map(|p| p.z()).fold(f32::INFINITY, |a, b| a.min(b));
+
+        //println!("min x: {}, y: {}, z: {}, max x: {}, y: {}, z: {}", min_x, min_y, min_z, max_x, max_y, max_z);
+
+        AABB::new_from_points([min_x, min_y, min_z].into(), [max_x, max_y, max_z ].into()).pad()
+    }
+    fn clone_dyn(&self) -> Box<dyn RTObject> {
+        Box::new(self.clone())
+    }
+}
+

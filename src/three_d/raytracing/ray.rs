@@ -2,7 +2,7 @@ use super::vector::Vec3;
 
 /// A struct to represent a Ray
 /// A Ray has an origin point and a direction that it points in
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Ray {
     origin: Vec3,
     direction: Vec3

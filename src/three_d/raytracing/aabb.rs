@@ -6,7 +6,7 @@ use crate::three_d::raytracing::vector::Vec3;
 /// A struct representing an axis-aligned bounding box
 /// This is used to speed up ray intersection calculations by rejecting rays faster
 /// Calculating intersections with a bounding box is much faster than for an arbitrary raytracing object, so this allows the code to reject more rays faster
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct AABB {
     /// The interval along the x-axis that the bounding box occupies
     pub x: Interval,

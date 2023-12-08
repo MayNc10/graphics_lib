@@ -156,8 +156,8 @@ impl Camera {
                 let r = Camera::get_ray_cmethod(i, j, self.pixel00_loc, self.pixel_delta_u, self.pixel_delta_v, self.camera_center);
                 let color = Camera::ray_color_parallel(&r, arc_world.clone(), arc_lights.clone(), self.max_depth, self.background);
                 let r = if color.x() == color.x() { color.x() } else { 0.0 };
-                let g = if color.x() == color.x() { color.x() } else { 0.0 };
-                let b = if color.x() == color.x() { color.x() } else { 0.0 };
+                let g = if color.y() == color.y() { color.y() } else { 0.0 };
+                let b = if color.z() == color.z() { color.z() } else { 0.0 };
                 [r, g, b].into()
             }).sum();
 
@@ -180,6 +180,23 @@ impl Camera {
         unsafe { fb.draw(self.image_width, self.image_height, dims, self.data.as_ptr()); }
     }
 
+    pub fn draw_to_image(&self, image_name: &str) {
+        let mut imgbuf = image::ImageBuffer::new(self.image_width as u32, self.image_height as u32);
+        for (x, y, pixel) in imgbuf.enumerate_pixels_mut() {
+            let idx = ((self.image_height as u32 - y - 1) * self.image_width as u32 + x) as usize;
+            let r: f32 = self.data[idx * 4];
+            let g: f32 = self.data[idx * 4 + 1];
+            let b: f32 = self.data[idx * 4 + 2];
+
+            let ir = (255.999 * r) as u8;
+            let ig = (255.999 * g) as u8;
+            let ib = (255.999 * b) as u8;
+
+            *pixel = image::Rgb([ir, ig, ib]);
+        }
+
+        imgbuf.save(image_name).unwrap();
+    }
 
     fn get_ray(&mut self, i: i32, j: i32) -> Ray {
         let pixel_center = self.pixel00_loc + (self.pixel_delta_u * i) + (self.pixel_delta_v * j);
@@ -214,6 +231,7 @@ impl Camera {
     }
 
     fn ray_color(r: &Ray, world: &dyn RTObject, lights: Option<&dyn RTObject>, rng: &mut ThreadRng, depth: i32, background: Vec3) -> Vec3 {
+
         // Don't gather more light if we've reached the depth
         if depth <= 0 { return Vec3::new([0.0; 3]) }
 

@@ -85,11 +85,13 @@ impl Material for Metal {
 /// These are materials such as glass or water
 pub struct Dielectric {
     refrac_index: f32,
+    glass_color: Vec3,
 }
 
 impl Dielectric {
     /// Create a new Dielectric material, given an index of reflection
-    pub fn new(refrac_index: f32) -> Dielectric { Dielectric { refrac_index } }
+    pub fn new(refrac_index: f32) -> Dielectric { Dielectric { refrac_index, glass_color: [1.0; 3].into() } }
+    pub fn new_colored(refrac_index: f32, color: Vec3) -> Dielectric { Dielectric { refrac_index, glass_color: color } }
 
     // Use Schlick approximation
     fn reflectance(cosine: f32, ref_idx: f32) -> f32 {
@@ -101,7 +103,7 @@ impl Dielectric {
 impl Material for Dielectric {
 
     fn scatter(&self, ray_in: Ray, rec: HitRecordNoMat) -> Option<(Vec3, Ray, Option<f32>)> {
-        let attenuation = Vec3::new([1.0; 3]);
+        let attenuation = self.glass_color;
         let refrac_ratio = if rec.front_face { 1.0 / self.refrac_index } else { self.refrac_index };
 
         let unit_direction = ray_in.direction().unit();

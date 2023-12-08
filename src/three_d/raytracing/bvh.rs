@@ -26,7 +26,13 @@ impl BVHNode {
         let comparator = |a: &Box<dyn RTObject>, b: &Box<dyn RTObject>| { BVHNode::box_compare(a.bounding_box(), b.bounding_box(), axis) };
 
         let object_span = end - start;
-        if object_span == 1 {
+        if object_span == 0 {
+            // this is pretty useless but it's nice to not stack overflow so
+            let left = Box::new(RTObjectVec::new());
+            let right = Box::new(RTObjectVec::new());
+            BVHNode { left, right, bbox: AABB::empty() }
+        }
+        else if object_span == 1 {
             let left = objects[start].clone();
             let right = Box::new(RTObjectVec::new()); // The original code is using Arc instead of Box, and so it has left == right
             // Here we've just made right empty, it should be fine
