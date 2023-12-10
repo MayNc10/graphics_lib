@@ -32,6 +32,9 @@ pub trait RTObject: Send + Sync {
     fn random(&self, o: Vec3) -> Vec3 {
         [1.0, 0.0, 0.0].into()
     }
+    fn center(&self) -> Option<Vec3> {
+        None
+    }
 }
 
 impl Clone for Box<dyn RTObject> {

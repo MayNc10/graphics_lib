@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use rand::{random, Rng, thread_rng};
 use crate::three_d::raytracing::aabb::AABB;
 use crate::three_d::raytracing::hit_record::{HitRecord, HitRecordNoMat};
@@ -123,4 +125,41 @@ impl Material for Dielectric {
         Some((attenuation, Ray::new(rec.p, direction), None))
     }
 
+}
+// This is wrong, but we'll fix it later
+
+pub struct SubSurface {
+    albedo: Vec3,    
+    distance: f32, // this isn't a true 'distance', just a mutliplier
+    fraction: f32,
+    current_object: Option<Rc<RTObject>> // FIXME: OVERHAUL API
+}
+
+impl SubSurface {
+    pub fn new(albedo: Vec3, distance: f32, fraction: f32) -> SubSurface {
+        SubSurface { albedo, distance, fraction, current_object: None}
+    }
+    pub fn set_current_object(&mut self, object: Rc<dyn RTObject>) {
+        self.current_object = Some(object);
+    } 
+}
+
+impl Material for SubSurface {
+    fn scatter(&self, ray_in: Ray, rec: HitRecordNoMat) -> Option<(Vec3, Ray, Option<f32>)> {
+        if self.current_object.is_none() { panic!("Object is None"); }
+
+        let object_ref = self.current_object.unwrap();
+
+        if rec.front_face {
+            // Move the vector back
+            let ray_to_orig = object_ref.center().unwrap() - ray_in.origin();
+            let ray_scaled = ray_to_orig.unit() * self.distance;
+            let ray_in_back = Ray::new(ray_in.origin() - ray_scaled, ray_in.direction());
+            // make the new ray hit objects
+            let new_hit = object_ref.ray_intersects(r, ray_t)
+        }
+        else {
+
+        }
+    }
 }
