@@ -1,5 +1,16 @@
 //! A Scene represents a set of lights, shapes, and a specific rendering program.
 
+const UP_INCREMENT: f32 = 1.0;
+const DOWN_INCREMENT: f32 = 1.0;
+const LEFT_INCREMENT: f32 = 1.0;
+const RIGHT_INCREMENT: f32 = 1.0;
+const FORWARD_INCREMENT: f32 = 1.0;
+const BACKWARD_INCREMENT: f32 = 1.0;
+const LOOK_UP_INCREMENT: f32 = 1.0;
+const LOOK_DOWN_INCREMENT: f32 = 1.0;
+const LOOK_LEFT_INCREMENT: f32 = 1.0;
+const LOOK_RIGHT_INCREMENT: f32 = 1.0;
+
 use glutin::ContextWrapper;
 use glutin::PossiblyCurrent;
 use glutin::window;
@@ -11,7 +22,7 @@ use super::shaders::Program;
 use super::lights::{DirectionLight, PointLight};
 use super::shape::Shape;
 use super::vao::VertexArrayObject;
-use crate::matrix::Mat4;
+use crate::matrix::{Mat4, view_matrix};
 
 use once_cell::sync::OnceCell;
 use std::ffi::CString;
@@ -47,6 +58,8 @@ pub fn init_deferred_quad() -> bool {
 pub struct Scene {
     shapes: Vec<Shape>,
     program: &'static Program,
+    position: [f32; 3],
+    direction: [f32; 3],
     view: Mat4,
     direction_lights: Vec<DirectionLight>,
     point_lights: Vec<PointLight>,
@@ -54,10 +67,10 @@ pub struct Scene {
 
 impl Scene {
     /// Create a new scene given a view matrix, a program to use, a set of direction lights, and a set of point lights.
-    pub fn new(view: Mat4, program: &'static Program, direction_lights: Vec<DirectionLight>, point_lights: Vec<PointLight>) -> Scene {
+    pub fn new(position: [f32; 3], program: &'static Program, direction_lights: Vec<DirectionLight>, point_lights: Vec<PointLight>, direction: [f32; 3], up: &[f32; 3]) -> Scene {
         let shapes = Vec::new();
 
-        Scene { shapes, program, view, direction_lights, point_lights }
+        Scene { shapes, program, position, direction, view: view_matrix(&position, &direction, up), direction_lights, point_lights }
     }
 
     /// Returns the index of the shape vector where the shape is stored.
@@ -65,6 +78,53 @@ impl Scene {
     pub fn add_shape(&mut self, shape: Shape) -> usize {
         self.shapes.push(shape);
         self.shapes.len() - 1
+    }
+}
+
+impl Scene {
+    pub fn move_up(&mut self, dt: f32, up: &[f32; 3]) {
+        self.position[1] += UP_INCREMENT * dt;
+        self.view = view_matrix(&self.position, &self.direction, up);
+    }
+    pub fn move_down(&mut self, dt: f32, up: &[f32; 3]) {
+        self.position[1] -= DOWN_INCREMENT * dt;
+        self.view = view_matrix(&self.position, &self.direction, up);
+    }
+    pub fn move_right(&mut self, dt: f32, up: &[f32; 3]) {
+        self.position[0] += RIGHT_INCREMENT * dt;
+        self.view = view_matrix(&self.position, &self.direction, up);
+    }
+    pub fn move_left(&mut self, dt: f32, up: &[f32; 3]) {
+        self.position[0] -= LEFT_INCREMENT * dt;
+        self.view = view_matrix(&self.position, &self.direction, up);
+    }
+    pub fn move_forward(&mut self, dt: f32, up: &[f32; 3]) {
+        self.position[2] -= FORWARD_INCREMENT * dt;
+        self.view = view_matrix(&self.position, &self.direction, up);
+    }
+    pub fn move_backward(&mut self, dt: f32, up: &[f32; 3]) {
+        self.position[2] += BACKWARD_INCREMENT * dt;
+        self.view = view_matrix(&self.position, &self.direction, up);
+    }
+
+    pub fn look_up(&mut self, dt: f32, up: &[f32; 3]) {
+        self.direction[1] += LOOK_UP_INCREMENT * dt;
+        self.view = view_matrix(&self.position, &self.direction, up);
+    }
+    pub fn look_down(&mut self, dt: f32, up: &[f32; 3]) {
+        self.direction[1] -= LOOK_DOWN_INCREMENT * dt;
+        self.view = view_matrix(&self.position, &self.direction, up);
+    }
+    pub fn look_right(&mut self, dt: f32, up: &[f32; 3]) {
+        self.direction[0] -= LOOK_RIGHT_INCREMENT * dt;
+        self.view = view_matrix(&self.position, &self.direction, up);
+    }
+    pub fn look_left(&mut self, dt: f32, up: &[f32; 3]) {
+        self.direction[0] += LOOK_LEFT_INCREMENT * dt;
+        self.view = view_matrix(&self.position, &self.direction, up);
+    }
+    pub fn clear(&mut self) {
+        self.shapes.clear();
     }
 }
 

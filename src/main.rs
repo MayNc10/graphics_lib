@@ -12,6 +12,9 @@ use std::ptr;
 use std::rc::Rc;
 use std::sync::Arc;
 use glutin::dpi::PhysicalSize;
+use glutin::event::Event::DeviceEvent;
+use glutin::event::{ElementState, VirtualKeyCode};
+use glutin::window::CursorIcon::Default;
 use rand::{random, Rng, thread_rng};
 use graphics_lib::cli::Cli;
 
@@ -27,6 +30,8 @@ use graphics_lib::three_d::raytracing::pdf::SpherePDF;
 use graphics_lib::three_d::raytracing::shape::{make_box, Quad, RotateY, RTObject, RTObjectVec, Sphere, Translate, Tri};
 use graphics_lib::three_d::raytracing::shape::polyhedron::Polyhedron;
 use graphics_lib::three_d::raytracing::vector::Vec3;
+use graphics_lib::three_d::shape::importing::Material;
+use std::default;
 
 // Set a target for fps (don't run faster or slower than this)
 const TARGET_FPS: u64 = 100;
@@ -63,67 +68,7 @@ fn main() {
     // Load the OpenGL function pointers
     gl::load_with(|symbol| gl_window.get_proc_address(symbol));
 
-    demo_rt_parallelogram(gl_window);
-
-    let window: glutin::window::WindowBuilder = glutin::window::WindowBuilder::new()
-        .with_title("Graphics Lib")
-        .with_inner_size(PhysicalSize::new(IMAGE_WIDTH, IMAGE_HEIGHT));
-    let gl_window = glutin::ContextBuilder::new()
-        .build_windowed(window, &event_loop)
-        .unwrap();
-
-    // It is essential to make the context current before calling `gl::load_with`.
-    let gl_window = unsafe { gl_window.make_current() }.unwrap();
-
-    // Load the OpenGL function pointers
-    gl::load_with(|symbol| gl_window.get_proc_address(symbol));
-
-    demo_rt_circles(gl_window);
-
-    let window: glutin::window::WindowBuilder = glutin::window::WindowBuilder::new()
-        .with_title("Graphics Lib")
-        .with_inner_size(PhysicalSize::new(IMAGE_WIDTH, IMAGE_HEIGHT));
-    let gl_window = glutin::ContextBuilder::new()
-        .build_windowed(window, &event_loop)
-        .unwrap();
-
-    // It is essential to make the context current before calling `gl::load_with`.
-    let gl_window = unsafe { gl_window.make_current() }.unwrap();
-
-    // Load the OpenGL function pointers
-    gl::load_with(|symbol| gl_window.get_proc_address(symbol));
-
-    demo_rt_cornell(gl_window);
-
-    let window: glutin::window::WindowBuilder = glutin::window::WindowBuilder::new()
-        .with_title("Graphics Lib")
-        .with_inner_size(PhysicalSize::new(IMAGE_WIDTH, IMAGE_HEIGHT));
-    let gl_window = glutin::ContextBuilder::new()
-        .build_windowed(window, &event_loop)
-        .unwrap();
-
-    // It is essential to make the context current before calling `gl::load_with`.
-    let gl_window = unsafe { gl_window.make_current() }.unwrap();
-
-    // Load the OpenGL function pointers
-    gl::load_with(|symbol| gl_window.get_proc_address(symbol));
-
-    demo_rt_glass_shards(gl_window);
-
-    let window: glutin::window::WindowBuilder = glutin::window::WindowBuilder::new()
-        .with_title("Graphics Lib")
-        .with_inner_size(PhysicalSize::new(IMAGE_WIDTH, IMAGE_HEIGHT));
-    let gl_window = glutin::ContextBuilder::new()
-        .build_windowed(window, &event_loop)
-        .unwrap();
-
-    // It is essential to make the context current before calling `gl::load_with`.
-    let gl_window = unsafe { gl_window.make_current() }.unwrap();
-
-    // Load the OpenGL function pointers
-    gl::load_with(|symbol| gl_window.get_proc_address(symbol));
-
-    demo_rt_cubes(gl_window);
+    rmath_day_1(event_loop, gl_window);
 }
 
 /* 
@@ -922,7 +867,286 @@ fn demo_rt(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
     });
 }
 
+fn rmath_day_1(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::PossiblyCurrent, glutin::window::Window>) {
+    unsafe {
+        gl::Enable(gl::DEPTH_TEST);
+        gl::DepthFunc(gl::LESS);
+    }
 
+    let light = DirectionLight {
+        direction: [-1.0, -1.0, -1.0],
+
+        ambient: [0.05, 0.05, 0.05],
+        diffuse: [0.4, 0.4, 0.4],
+        specular: [0.5, 0.5, 0.5],
+    };
+    let light2 = DirectionLight {
+        direction: [1.0, 1.0, -1.0],
+
+        ambient: [0.05, 0.05, 0.05],
+        diffuse: [0.4, 0.4, 0.4],
+        specular: [0.5, 0.5, 0.5],
+    };
+    let light3 = DirectionLight {
+        direction: [-1.0, -1.0, 1.0],
+
+        ambient: [0.05, 0.05, 0.05],
+        diffuse: [0.4, 0.4, 0.4],
+        specular: [0.5, 0.5, 0.5],
+    };
+    let light4 = DirectionLight {
+        direction: [1.0, 1.0, 1.0],
+
+        ambient: [0.05, 0.05, 0.05],
+        diffuse: [0.4, 0.4, 0.4],
+        specular: [0.5, 0.5, 0.5],
+    };
+
+    init_deferred_quad();
+
+    let dims = gl_window.window().inner_size();
+    let width = dims.width as i32;
+    let height = dims.height as i32;
+
+    let mut frame_buffer = FrameBuffer::new(width, height);
+
+    // Create GLSL shaders
+    let program = &*shaders::BLINN_PHONG;
+
+    let prepass_program = &*shaders::PREPASS;
+
+    let lighting_program = &*shaders::BLINN_PHONG_LIGHTING;
+
+    let point_lighting_program = &*shaders::BLINN_PHONG_POINT_LIGHTING;
+
+    let emission = &*shaders::EMISSION;
+
+    let mut scene = Scene::new([0.0, 0.0, 0.0], program, vec![light, light2, light3, light4], vec![], [0.0, 0.0, 1.0], &[0.0, 1.0, 0.0]);
+
+    let color_name = CString::new("color").unwrap();
+
+    lighting_program.bind_color_output(&color_name);
+    point_lighting_program.bind_color_output(&color_name);
+    program.bind_color_output(&color_name);
+
+
+    let mut s = Shape::from_obj(
+        &shape_path("square.obj"),
+        ShaderType::BlinnPhong,
+        None,
+        None,
+        false,
+    ).unwrap();
+
+    s.bind_attributes(&program);
+
+    let offset = 0.25;
+
+    s.set_scaling(generate_scale(&[0.10; 3]));
+    s.set_translation(generate_translate(None, None, Some(-2.0)));
+
+    scene.add_shape(s);
+
+    let mut idx: i32 = 1;
+
+    let mut t: f32 = 0.0;
+    let delta: f32 = 0.02;
+
+    let mut start_time = std::time::Instant::now();
+    let mut dims_ps = gl_window.window().inner_size();
+    let mut dims = (dims_ps.width as f32, dims_ps.height as f32);
+
+    event_loop.run(move |event, _, control_flow| {
+
+        use glutin::event::{Event, WindowEvent, DeviceEvent, VirtualKeyCode};
+        use glutin::event_loop::ControlFlow;
+        *control_flow = ControlFlow::Wait;
+        match event {
+            Event::LoopDestroyed => return,
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::CloseRequested => {
+                    *control_flow = ControlFlow::Exit
+                },
+                _ => (),
+            },
+            Event::RedrawRequested(_) => {
+                let elapsed_time = std::time::Instant::now().duration_since(start_time).as_millis() as u64;
+
+                // How long should we wait for to run at 60 fps?
+                let wait_millis = match 1000 / TARGET_FPS >= elapsed_time {
+                    true => 1000 / TARGET_FPS - elapsed_time,
+                    false => 0
+                };
+
+                if wait_millis == 0 {
+                    // Update time
+                    t += delta;
+
+                    if dims_ps != gl_window.window().inner_size() {
+                        dims_ps = gl_window.window().inner_size();
+                        dims = (dims_ps.width as f32, dims_ps.height as f32);
+                        frame_buffer = FrameBuffer::new(dims.0 as i32, dims.0 as i32);
+                    }
+
+                    scene.draw_deferred(t, dims, &gl_window,
+                                        prepass_program, lighting_program, point_lighting_program, emission,
+                                        &frame_buffer
+                    );
+
+                    start_time = std::time::Instant::now();
+                }
+
+            },
+            Event::DeviceEvent { device_id: _, event } => {
+                match event {
+                    DeviceEvent::Key(key) => {
+                        if key.state == ElementState::Pressed {
+                            match key.virtual_keycode {
+                                Some(VirtualKeyCode::W) => {
+                                    scene.move_forward(delta, &[0.0, 1.0, 0.0]);
+                                },
+                                Some(VirtualKeyCode::S) => {
+                                    scene.move_backward(delta, &[0.0, 1.0, 0.0]);
+                                },
+                                Some(VirtualKeyCode::A) => {
+                                    scene.move_left(delta, &[0.0, 1.0, 0.0]);
+                                },
+                                Some(VirtualKeyCode::D) => {
+                                    scene.move_right(delta, &[0.0, 1.0, 0.0]);
+                                },
+                                Some(VirtualKeyCode::Space) => {
+                                    scene.move_up(delta, &[0.0, 1.0, 0.0]);
+                                },
+                                Some(VirtualKeyCode::LShift) => {
+                                    scene.move_down(delta,  &[0.0, 1.0, 0.0]);
+                                },
+                                Some(VirtualKeyCode::Left) => {
+                                    scene.look_left(delta, &[0.0, 1.0, 0.0]);
+                                },
+                                Some(VirtualKeyCode::Right) => {
+                                    scene.look_right(delta, &[0.0, 1.0, 0.0]);
+                                },
+                                Some(VirtualKeyCode::Up) => {
+                                    scene.look_up(delta, &[0.0, 1.0, 0.0]);
+                                },
+                                Some(VirtualKeyCode::Down) => {
+                                    scene.look_down(delta,  &[0.0, 1.0, 0.0]);
+                                },
+
+
+                                Some(VirtualKeyCode::Return) => {
+                                    scene.clear();
+                                    idx += 1;
+                                    let mut is_white = true;
+                                    // build from left to right, forward to back, bottom to top
+                                    let starting_num = idx.pow(2);
+                                    let number_of_nums = idx + 1;
+                                    let mut starting_position = [0.0, 0.0, -2.0];
+                                    for num in starting_num..(starting_num + number_of_nums) {
+                                        // now, make a slice
+                                        let side_length = idx;
+                                        for x in 0..side_length {
+                                            for y in 0..side_length {
+                                                let name = if is_white {
+                                                    "square_white.obj"
+                                                } else{ "square.obj" };
+                                                is_white = !is_white;
+
+                                                let mut s = Shape::from_obj(
+                                                    &shape_path(name),
+                                                    ShaderType::BlinnPhong,
+                                                    None,
+                                                    None,
+                                                    false,
+                                                ).unwrap();
+
+                                                s.bind_attributes(&program);
+
+                                                s.set_scaling(generate_scale(&[0.10; 3]));
+                                                s.set_translation(generate_translate(Some(starting_position[0] + x as f32 * offset), Some(starting_position[1] + y as f32 * offset), Some(starting_position[2])));
+                                                scene.add_shape(s);
+                                            }
+                                        }
+                                        // Add extra blocks
+                                        let extra_blocks = num - side_length * side_length;
+                                        for x in 0..extra_blocks {
+                                            let name = if is_white {
+                                                "square_white.obj"
+                                            } else{ "square.obj" };
+                                            is_white = !is_white;
+
+                                            let mut s = Shape::from_obj(
+                                                &shape_path(name),
+                                                ShaderType::BlinnPhong,
+                                                None,
+                                                None,
+                                                false,
+                                            ).unwrap();
+
+                                            s.bind_attributes(&program);
+
+                                            s.set_scaling(generate_scale(&[0.10; 3]));
+                                            s.set_translation(generate_translate(Some(starting_position[0] + x as f32 * offset), Some(starting_position[1] + side_length as f32 * offset), Some(starting_position[2])));
+                                            scene.add_shape(s);
+                                        }
+
+                                        starting_position[2] -= offset;
+                                    }
+
+                                },
+                                Some(VirtualKeyCode::Key1) => {
+                                    scene.clear();
+
+                                    let mut s = Shape::from_obj(
+                                        &shape_path("square.obj"),
+                                        ShaderType::BlinnPhong,
+                                        None,
+                                        None,
+                                        false,
+                                    ).unwrap();
+
+                                    s.bind_attributes(&program);
+
+                                    s.set_scaling(generate_scale(&[0.10; 3]));
+                                    s.set_translation(generate_translate(None, None, Some(-2.0)));
+                                    scene.add_shape(s);
+
+                                    idx = 1;
+                                },
+                                _ => {},
+                            }
+                        }
+                    },
+                    _ => {},
+                }
+                gl_window.window().request_redraw();
+            },
+            _ => (),
+        }
+
+        match *control_flow {
+            ControlFlow::Exit => (),
+            _ => {
+                gl_window.window().request_redraw();
+
+                let elapsed_time = std::time::Instant::now().duration_since(start_time).as_millis() as u64;
+
+                // How long should we wait for to run at 60 fps?
+                let wait_millis = match 1000 / TARGET_FPS >= elapsed_time {
+                    true => 1000 / TARGET_FPS - elapsed_time,
+                    false => 0
+                };
+
+                let new_inst = start_time + std::time::Duration::from_millis(wait_millis);
+                // Wait that long
+                *control_flow =  ControlFlow::WaitUntil(new_inst);
+                //println!("Hitting fps goal!");
+            }
+        }
+    });
+
+
+}
 
 fn shape_path(name: &str) -> String {
     String::from(MEDIA_PATH_BASE.join(Path::new(name)).to_str().unwrap())
@@ -989,7 +1213,7 @@ fn demo_3d(event_loop: EventLoop<()>, gl_window: glutin::ContextWrapper<glutin::
 
     let emission = &*shaders::EMISSION;
 
-    let mut scene = Scene::new(view, program, vec![light], vec![]);
+    let mut scene = Scene::new([0.0, 0.0, 0.0], program, vec![light], vec![], [0.0, 0.0, 1.0], &[0.0, 1.0, 0.0]);
 
     let color_name = CString::new("color").unwrap();
 
